@@ -42,7 +42,6 @@ namespace WebCameraApi.Services
             { "overtimeTarry", "超时逗留" },
             { "standUp", "起立检测" },
             { "advReachHeight", "攀高检测" },
-            // 后续新增类型直接在此补充
         };
         // 3. 构造函数注入核心依赖
         public HikAlarmService(ILogger<HikAlarmService> logger,
