@@ -45,4 +45,20 @@
         /// </summary>
         public string RawData { get; set; }
     }
+
+    /// <summary>
+    /// 报警统计返回对象（用于图表展示）
+    /// </summary>
+    public class AlarmCountDto
+    {
+        /// <summary>
+        /// 名称（事件类型中文名）
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// 数值（出现次数）
+        /// </summary>
+        public int Value { get; set; }
+    }
 }

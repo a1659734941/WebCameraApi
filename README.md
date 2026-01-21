@@ -312,13 +312,13 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 {
   "code": 200,
   "message": "获取成功",
-  "data": {
-    "制服检测": 10,
-    "人数统计": 5,
-    "超时逗留": 3,
-    "起立检测": 2,
-    "攀高检测": 1
-  }
+  "data": [
+    { "value": 10, "name": "制服检测" },
+    { "value": 5, "name": "人数统计" },
+    { "value": 3, "name": "超时逗留" },
+    { "value": 2, "name": "起立检测" },
+    { "value": 1, "name": "攀高检测" }
+  ]
 }
 ```
 

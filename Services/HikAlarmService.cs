@@ -16,6 +16,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using WebCameraApi.Utils.PostgreConfig.Dto;
 
 namespace WebCameraApi.Services
@@ -453,26 +454,34 @@ namespace WebCameraApi.Services
         /// 获取所有报警记录，查看不同事件的出现次数
         /// </summary>
         /// <returns>每一种事件出现了多少次</returns>
-        /// 返回结果示例:
-        /// {
-        ///     "入侵报警": 10,
-        ///     "越界报警": 5,
-        ///     "其他事件": 3
-        /// }
-        public Dictionary<string, int> GetAllAlarmRecordCount()
+        /// 修改返回为
+
+        public List<AlarmCountDto> GetAllAlarmRecordCount()
         {
-            var result = new Dictionary<string, int>();
-            result = _PgHikAlarmRecord.GetAllAlarmRecordCountAsync(_connectionString).Result;
-            //翻译EventType为中文
-            foreach (var key in result.Keys.ToList())
+            var rawList = _PgHikAlarmRecord.GetAllAlarmRecordCountAsync(_connectionString).Result;
+
+            // 将原始结果转为字典，便于翻译与补全
+            var rawDict = rawList.ToDictionary(
+                item => item.Name,
+                item => item.Value,
+                StringComparer.OrdinalIgnoreCase);
+
+            var result = new List<AlarmCountDto>();
+
+            // 先输出已知事件类型（无记录时补0，保证前端稳定展示）
+            foreach (var item in _eventTypeTransDict)
             {
-                if (_eventTypeTransDict.TryGetValue(key, out var chineseName))
-                {
-                    int count = result[key];
-                    result.Remove(key); 
-                    result[chineseName] = count;
-                }
+                rawDict.TryGetValue(item.Key, out var count);
+                result.Add(new AlarmCountDto { Name = item.Value, Value = count });
+                rawDict.Remove(item.Key);
             }
+
+            // 再输出未在映射表中的事件类型（保留原名称）
+            foreach (var item in rawDict)
+            {
+                result.Add(new AlarmCountDto { Name = item.Key, Value = item.Value });
+            }
+
             return result;
         }
     }

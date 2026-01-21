@@ -272,18 +272,18 @@ namespace PostgreConfig
         /// <param name="_connectionString">数据库连接字符串</param>
         /// <returns>每一种事件出现了多少次</returns>
         //返回结果示例:
-        //{
-        //  "入侵报警": 10,
-        //  "越界报警": 5,
-        //  "其他事件": 3
-        //}
-        public async Task<Dictionary<string, int>> GetAllAlarmRecordCountAsync(string _connectionString)
+        //[
+        //  { "Name": "入侵报警", "Value": 10 },
+        //  { "Name": "越界报警", "Value": 5 },
+        //  { "Name": "其他事件", "Value": 3 }
+        //]
+        public async Task<List<AlarmCountDto>> GetAllAlarmRecordCountAsync(string _connectionString)
         {
             var sql = @"
                 SELECT EventType, COUNT(*) AS Count
                 FROM hik_alarm_record
                 GROUP BY EventType;";
-            var result = new Dictionary<string, int>();
+            var result = new List<AlarmCountDto>();
             try
             {
                 using(var conn = new NpgsqlConnection(_connectionString))
@@ -295,7 +295,11 @@ namespace PostgreConfig
                         {
                             while(await reader.ReadAsync())
                             {
-                                result[reader.GetString(reader.GetOrdinal("EventType"))] = reader.GetInt32(reader.GetOrdinal("Count"));
+                                result.Add(new AlarmCountDto
+                                {
+                                    Name = reader.GetString(reader.GetOrdinal("EventType")),
+                                    Value = reader.GetInt32(reader.GetOrdinal("Count"))
+                                });
                             }
                         }
                     }

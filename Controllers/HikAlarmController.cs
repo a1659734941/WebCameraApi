@@ -113,18 +113,18 @@ namespace WebCameraApi.Controllers
         /// </summary>
         /// <returns>每一种事件出现了多少次</returns>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResponseDto<Dictionary<string, int>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto<List<AlarmCountDto>>), StatusCodes.Status200OK)]
         public IActionResult GetAllAlarmRecordCount()
         {
             try
             {
                 var result = _hikAlarmService.GetAllAlarmRecordCount();
-                return Ok(ApiResponseDto<Dictionary<string, int>>.Success(result, "获取成功"));
+                return Ok(ApiResponseDto<List<AlarmCountDto>>.Success(result, "获取成功"));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.GetAllAlarmRecordCount 接口获取异常");
-                return Ok(ApiResponseDto<Dictionary<string, int>>.Fail("获取异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto<List<AlarmCountDto>>.Fail("获取异常（内部日志已记录）", 500));
             }
         }
     }
