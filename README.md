@@ -23,17 +23,23 @@ WebCameraApi 是一个基于 .NET 8.0 的 Web API 项目，用于集成和管理
 - **人数计数接口**：接收摄像头人数计数数据，当人数少于阈值时自动发送锁定/解锁请求
 - **行为分析接口**：接收摄像头行为分析 JSON 数据，包括制服检测、人数统计、超时逗留、起立检测、攀高检测等
 - **报警记录查询**：支持按时间范围、事件类型、设备名称筛选，支持分页查询
+- **报警记录统计**：获取所有报警记录中不同事件类型出现的次数统计
 - **图片下载和存储**：自动下载报警截图并保存到本地，返回相对路径供前端访问
-- **防抖机制**：避免同一 IP 短时间内重复发送相同请求
+- **防抖机制**：避免同一 IP 短时间内重复发送相同请求（默认1000ms）
+- **高并发支持**：使用并发安全字典（ConcurrentDictionary）处理多线程场景
 
 ## 技术栈
 
 - **框架**：.NET 8.0
 - **数据库**：PostgreSQL
-- **日志**：Serilog（支持控制台和文件输出）
+- **日志**：Serilog（支持控制台和文件输出，按天滚动保留180天）
 - **API 文档**：Swagger
 - **协议支持**：ONVIF（摄像头）、海康威视 SDK（门禁和报警）
-- **其他**：Newtonsoft.Json、Npgsql、System.Text.Encoding.CodePages
+- **HTTP 客户端**：HttpClient（支持超时控制和重定向配置）
+- **JSON 处理**：Newtonsoft.Json、System.Text.Json
+- **数据库驱动**：Npgsql
+- **编码支持**：System.Text.Encoding.CodePages
+- **ONVIF 库**：XiaoFeng.Onvif
 
 ## 环境要求
 
@@ -41,6 +47,10 @@ WebCameraApi 是一个基于 .NET 8.0 的 Web API 项目，用于集成和管理
 - **.NET SDK**：.NET 8.0 或更高版本
 - **数据库**：PostgreSQL 10.0 或更高版本
 - **依赖库**：海康威视 SDK 文件（已包含在 `res/lib` 目录）
+- **网络要求**：
+  - 摄像头设备需支持 ONVIF 协议
+  - 门禁设备需支持海康威视 SDK
+  - 需要访问摄像头和门禁设备的网络连通性
 
 ## 安装和配置
 
@@ -286,6 +296,32 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 }
 ```
 
+#### 获取所有报警记录统计
+
+**接口地址**：`/api/HikAlarm/GetAllAlarmRecordCount`
+
+**请求方法**：GET
+
+**功能说明**：
+- 获取所有报警记录中不同事件类型出现的次数
+- 自动将事件类型翻译为中文
+- 用于统计分析和报表展示
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "制服检测": 10,
+    "人数统计": 5,
+    "超时逗留": 3,
+    "起立检测": 2,
+    "攀高检测": 1
+  }
+}
+```
+
 ## 数据库表结构
 
 ### 摄像头配置表（onvif_camera_infomation）
@@ -353,37 +389,179 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 ```
 WebCameraApi/
 ├── Controllers/          # 控制器层
-│   ├── CameraRtspController.cs
-│   ├── HikACController.cs
-│   └── HikAlarmController.cs
+│   ├── CameraRtspController.cs    # 摄像头RTSP接口控制器
+│   ├── HikACController.cs         # 海康门禁接口控制器
+│   └── HikAlarmController.cs      # 海康报警接口控制器
 ├── Services/            # 服务层
-│   ├── CameraRtspService.cs
-│   ├── HikAcService.cs
-│   └── HikAlarmService.cs
+│   ├── CameraRtspService.cs       # 摄像头RTSP服务
+│   ├── HikAcService.cs            # 海康门禁服务
+│   └── HikAlarmService.cs         # 海康报警服务
 ├── Dto/                 # 数据传输对象
+│   ├── ApiResponseDto.cs          # 通用API响应格式
+│   ├── CameraRtspRequest.cs       # 摄像头RTSP请求
+│   ├── CameraRtspResponse.cs      # 摄像头RTSP响应
+│   └── HikAcDto.cs                # 海康门禁DTO
 ├── Utils/               # 工具类
-│   ├── ConfigGet/       # 配置获取
-│   ├── HikAcessControl/ # 海康门禁
-│   ├── HikAlarmEndPoints/ # 海康报警
-│   ├── OnvifManager/    # ONVIF 管理
-│   └── PostgreConfig/   # PostgreSQL 配置
-├── res/lib/             # 海康威视 SDK 文件
+│   ├── ConfigGet/       # 配置获取工具
+│   │   └── Appsettings_Get.cs
+│   ├── HikAcessControl/ # 海康门禁工具
+│   │   ├── Dto/HikAcDto.cs
+│   │   └── Utils/CHCNetSDK.cs, HikAC.cs
+│   ├── HikAlarmEndPoints/ # 海康报警工具
+│   │   ├── Dto/HikAlarmRecordDto.cs
+│   │   └── Util/
+│   ├── OnvifManager/    # ONVIF管理工具
+│   │   ├── DTO/         # ONVIF数据传输对象
+│   │   └── Util/        # ONVIF工具类
+│   └── PostgreConfig/   # PostgreSQL配置和仓储
+│       ├── Dto/         # 数据库DTO
+│       └── Util/        # 数据库仓储类
+├── res/lib/             # 海康威视SDK文件
+│   ├── HCNetSDK.dll     # 海康SDK核心库
+│   ├── PlayCtrl.dll     # 播放控制库
+│   └── HCNetSDKCom/     # SDK组件库
 ├── wwwroot/             # 静态文件目录
 │   └── HikAlarmSnapshotBase64/ # 报警截图存储目录
 ├── logs/                # 日志文件目录
+├── bin/                 # 编译输出目录
+├── obj/                 # 编译中间文件目录
 ├── appsettings.json     # 开发环境配置
 ├── appsettings.Production.json # 生产环境配置
-└── Program.cs           # 程序入口
+├── appsettings.Development.json # 开发环境配置
+├── WebCameraApi.csproj  # 项目文件
+├── Program.cs           # 程序入口
+└── 打包.bat             # 打包脚本
 ```
 
 ## 注意事项
 
-1. **海康威视 SDK**：项目依赖海康威视 SDK 文件，请确保 `res/lib` 目录下的所有 DLL 文件完整
-2. **数据库配置**：请根据实际环境修改 `appsettings.json` 中的数据库连接信息
-3. **端口配置**：生产环境默认使用 12345（HTTP）和 54321（HTTPS）端口，可根据需要修改
+1. **海康威视 SDK**：项目依赖海康威视 SDK 文件，请确保 `res/lib` 目录下的所有 DLL 文件完整，包括 `HCNetSDK.dll`、`PlayCtrl.dll` 等
+2. **数据库配置**：请根据实际环境修改 `appsettings.json` 中的数据库连接信息（host、database、username、password、port）
+3. **端口配置**：
+   - 开发环境：默认使用 5000（HTTP）和 5001（HTTPS）端口
+   - 生产环境：默认使用 12345（HTTP）和 54321（HTTPS）端口
+   - 可在 `appsettings.Production.json` 中修改 `Urls` 配置
 4. **HTTPS 重定向**：项目默认启用 HTTPS 重定向，生产环境请配置 SSL 证书
-5. **CORS 配置**：当前配置允许所有来源的跨域请求，生产环境建议根据实际需求调整
+5. **CORS 配置**：当前配置允许所有来源的跨域请求（`AllowAll` 策略），生产环境建议根据实际需求调整，仅允许可信来源
+6. **日志管理**：
+   - 日志文件存储在 `logs` 目录，按天滚动生成
+   - 默认保留最近 180 天的日志文件
+   - 生产环境建议定期备份重要日志
+7. **图片存储**：报警截图自动保存到 `wwwroot/HikAlarmSnapshotBase64` 目录，请确保磁盘空间充足
+8. **防抖机制**：人数计数接口默认使用 1000ms 防抖时间，避免短时间内重复发送相同请求
+9. **超时设置**：HTTP 请求默认超时时间为 3 秒，可在 `Program.cs` 中调整
+10. **并发处理**：报警服务使用并发安全字典处理高并发场景，确保数据一致性
+11. **事件类型翻译**：报警记录查询会自动将英文事件类型翻译为中文（如 `uniformDetection` → `制服检测`）
+12. **容器化支持**：项目支持 Docker 容器化部署，配置了 `ContainerBaseImage` 和 `ContainerPort`
 
 ## 许可证
 
 本项目仅供内部使用，请勿用于商业用途。
+
+## 常见问题
+
+### 1. 如何添加新的摄像头配置？
+
+在 PostgreSQL 数据库的 `onvif_camera_infomation` 表中插入新记录：
+
+```sql
+INSERT INTO onvif_camera_infomation (id, camera_name, ip, port, user, password, retry_count, wait_milliseconds)
+VALUES (gen_random_uuid(), '新摄像头', '192.168.1.100', 80, 'admin', 'password', 3, 1000);
+```
+
+### 2. 如何添加新的门禁配置？
+
+在 PostgreSQL 数据库的 `hik_ac_infomation` 表中插入新记录：
+
+```sql
+INSERT INTO hik_ac_infomation (id, hik_ac_name, hik_ac_ip, hik_ac_port, hik_ac_user, hik_ac_password)
+VALUES (gen_random_uuid(), '新门禁', '192.168.1.200', 8000, 'admin', 'password');
+```
+
+### 3. 如何配置报警绑定？
+
+在 PostgreSQL 数据库的 `hik_alarm_bind` 表中插入绑定配置：
+
+```sql
+INSERT INTO hik_alarm_bind (key, value)
+VALUES ('192.168.1.100', '{"BlockComputerIP":"192.168.1.50"}');
+```
+
+### 4. 如何查看日志？
+
+日志文件存储在 `logs` 目录，文件名格式为 `Log-YYYYMMDD.txt`。可以使用文本编辑器或日志查看工具打开。
+
+### 5. 如何修改防抖时间？
+
+在 `HikAlarmService.cs` 中修改 `_debounceMilliseconds` 常量的值（默认为 1000 毫秒）。
+
+### 6. 如何修改 HTTP 请求超时时间？
+
+在 `Program.cs` 中修改 HttpClient 的超时配置（默认为 3000 毫秒）。
+
+### 7. 报警截图存储在哪里？
+
+报警截图存储在 `wwwroot/HikAlarmSnapshotBase64` 目录，文件名格式为 `{设备名}_{事件类型}_{时间戳}.jpg`。
+
+### 8. 如何部署到生产环境？
+
+1. 修改 `appsettings.Production.json` 中的数据库连接和 URL 配置
+2. 运行 `打包.bat` 脚本进行打包
+3. 将打包后的文件部署到生产服务器
+4. 配置 SSL 证书（如需要）
+5. 启动服务：`dotnet WebCameraApi.dll --environment Production`
+
+### 9. 如何解决摄像头 RTSP 获取失败问题？
+
+- 检查摄像头是否支持 ONVIF 协议
+- 确认摄像头的 IP、端口、用户名、密码配置正确
+- 检查网络连通性
+- 查看 `logs` 目录下的日志文件，获取详细错误信息
+- 尝试增加 `retry_count` 和 `wait_milliseconds` 参数
+
+### 10. 如何解决门禁开门失败问题？
+
+- 检查门禁设备是否支持海康威视 SDK
+- 确认门禁的 IP、端口、用户名、密码配置正确
+- 检查网络连通性
+- 查看 `logs` 目录下的日志文件，获取详细错误信息
+- 确认门禁设备在线且未被锁定
+
+### 11. 如何启用 HTTPS？
+
+1. 获取 SSL 证书（.pfx 或 .pem 格式）
+2. 在 `appsettings.Production.json` 中配置证书路径和密码
+3. 或使用 IIS、Nginx 等反向代理配置 HTTPS
+
+### 12. 如何修改日志保留天数？
+
+在 `Program.cs` 中修改 `retainedFileCountLimit` 参数（默认为 180 天）。
+
+## 开发指南
+
+### 本地开发
+
+1. 克隆项目到本地
+2. 配置 `appsettings.json` 中的数据库连接
+3. 运行 `dotnet restore` 恢复依赖
+4. 运行 `dotnet run` 启动开发服务器
+5. 访问 `http://localhost:5000/swagger` 查看 API 文档
+
+### 调试
+
+1. 使用 Visual Studio 或 VS Code 打开项目
+2. 设置断点
+3. 按 F5 启动调试
+4. 使用 Swagger 或 Postman 测试接口
+
+### 代码规范
+
+- 遵循 C# 命名规范
+- 使用 XML 注释文档化公共 API
+- 保持代码简洁清晰，避免过度设计
+- 使用 Serilog 记录关键操作和异常信息
+
+## 版本历史
+
+- **v1.0.0**：初始版本，支持摄像头 RTSP 获取、门禁控制、报警处理功能
+- **v1.1.0**：新增报警记录统计接口，优化防抖机制，增强并发处理能力
