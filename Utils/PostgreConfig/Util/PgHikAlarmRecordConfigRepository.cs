@@ -266,5 +266,45 @@ namespace PostgreConfig
                 throw new InvalidOperationException($"写入数据库失败：{ex.Message}", ex);
             }
         }
+        /// <summary>
+        /// 获取所有报警记录，查看不同事件的出现次数
+        /// </summary>
+        /// <param name="_connectionString">数据库连接字符串</param>
+        /// <returns>每一种事件出现了多少次</returns>
+        //返回结果示例:
+        //{
+        //  "入侵报警": 10,
+        //  "越界报警": 5,
+        //  "其他事件": 3
+        //}
+        public async Task<Dictionary<string, int>> GetAllAlarmRecordCountAsync(string _connectionString)
+        {
+            var sql = @"
+                SELECT EventType, COUNT(*) AS Count
+                FROM hik_alarm_record
+                GROUP BY EventType;";
+            var result = new Dictionary<string, int>();
+            try
+            {
+                using(var conn = new NpgsqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+                    using(var cmd = new NpgsqlCommand(sql, conn))
+                    {
+                        using(var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            while(await reader.ReadAsync())
+                            {
+                                result[reader.GetString(reader.GetOrdinal("EventType"))] = reader.GetInt32(reader.GetOrdinal("Count"));
+                            }
+                        }
+                    }
+                }
+            }
+            catch(Exception ex){
+                throw new Exception("获取所有报警记录，查看不同事件的出现次数时发生异常：" + ex.Message);
+            }
+            return result;
+        }
     }
 }

@@ -449,5 +449,31 @@ namespace WebCameraApi.Services
 
             return resultDict;
         }
+        /// <summary>
+        /// 获取所有报警记录，查看不同事件的出现次数
+        /// </summary>
+        /// <returns>每一种事件出现了多少次</returns>
+        /// 返回结果示例:
+        /// {
+        ///     "入侵报警": 10,
+        ///     "越界报警": 5,
+        ///     "其他事件": 3
+        /// }
+        public Dictionary<string, int> GetAllAlarmRecordCount()
+        {
+            var result = new Dictionary<string, int>();
+            result = _PgHikAlarmRecord.GetAllAlarmRecordCountAsync(_connectionString).Result;
+            //翻译EventType为中文
+            foreach (var key in result.Keys.ToList())
+            {
+                if (_eventTypeTransDict.TryGetValue(key, out var chineseName))
+                {
+                    int count = result[key];
+                    result.Remove(key); 
+                    result[chineseName] = count;
+                }
+            }
+            return result;
+        }
     }
 }
