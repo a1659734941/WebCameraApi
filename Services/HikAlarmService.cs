@@ -429,11 +429,17 @@ namespace WebCameraApi.Services
         /// <param name="_deviceName"></param>
         /// <param name="pageNumber"></param>
         /// <param name="pageSize"></param>
-        public Dictionary<string, HikAlarmRecordDto> SelectAlarmInfomation(string? _startTime, string? _endTime, string? _eventType, string? _deviceName, int pageNumber, int pageSize)
+        public HikAlarmRecordPageDto SelectAlarmInfomation(string? _startTime, string? _endTime, string? _eventType, string? _deviceName, int pageNumber, int pageSize)
         {
-            var resultDict = new Dictionary<string, HikAlarmRecordDto>();
+            pageNumber = Math.Max(1, pageNumber);
+            pageSize = Math.Max(1, pageSize);
+
             // 调用仓储层查询原始数据
-            resultDict = _PgHikAlarmRecord.SelectHikAlarmRecordAsync(_connectionString, _startTime, _endTime, _eventType, _deviceName, pageNumber, pageSize).Result;
+            var resultDict = _PgHikAlarmRecord.SelectHikAlarmRecordAsync(
+                _connectionString, _startTime, _endTime, _eventType, _deviceName, pageNumber, pageSize).Result;
+
+            var total = _PgHikAlarmRecord.CountHikAlarmRecordAsync(
+                _connectionString, _startTime, _endTime, _eventType, _deviceName).Result;
 
             // 遍历结果，翻译EventType为中文
             foreach (var key in resultDict.Keys.ToList()) // ToList避免遍历中修改集合
@@ -448,7 +454,21 @@ namespace WebCameraApi.Services
                 resultDict[key] = dto;
             }
 
-            return resultDict;
+            var orderedList = resultDict
+                .OrderByDescending(item => item.Value.EventTime)
+                .Select(item => new Dictionary<string, HikAlarmRecordDto>
+                {
+                    { item.Key, item.Value }
+                })
+                .ToList();
+
+            return new HikAlarmRecordPageDto
+            {
+                List = orderedList,
+                PageNum = pageNumber,
+                PageSize = pageSize,
+                Total = total
+            };
         }
         /// <summary>
         /// 获取所有报警记录，查看不同事件的出现次数

@@ -2,6 +2,7 @@
 using Npgsql;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace PostgreConfig
@@ -77,10 +78,10 @@ namespace PostgreConfig
         /// <returns></returns>
         public async Task<Dictionary<string, HikAlarmRecordDto>> SelectHikAlarmRecordAsync(
             string _connectionString,
-            string _startTime,
-            string _endTime,
-            string _eventType,
-            string deviceName,
+            string? _startTime,
+            string? _endTime,
+            string? _eventType,
+            string? deviceName,
             int pageNumber,
             int pageSize)
         {
@@ -92,57 +93,92 @@ namespace PostgreConfig
             pageSize = Math.Max(1, pageSize);
             int offset = (pageNumber - 1) * pageSize;
 
-            // 构建SQL查询语句（动态拼接条件，参数化防注入）
-            var sqlBuilder = new System.Text.StringBuilder();
-            sqlBuilder.Append(@"
-                SELECT Id, EventType, EventTime, DeviceName, ChannelName, 
-                       TaskName, SnapshotBase64Path, RawData
-                FROM hik_alarm_record
-                WHERE 1=1 "); // 占位条件，方便拼接AND
-
             // 构建参数集合
             var parameters = new List<NpgsqlParameter>();
-
-            // 1. 时间范围条件（开始时间）
-            if (!string.IsNullOrWhiteSpace(_startTime) && DateTime.TryParse(_startTime, out DateTime startTime))
-            {
-                sqlBuilder.Append(" AND EventTime >= @StartTime ");
-                parameters.Add(new NpgsqlParameter("@StartTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = startTime });
-            }
-
-            // 2. 时间范围条件（结束时间）
-            if (!string.IsNullOrWhiteSpace(_endTime) && DateTime.TryParse(_endTime, out DateTime endTime))
-            {
-                sqlBuilder.Append(" AND EventTime <= @EndTime ");
-                parameters.Add(new NpgsqlParameter("@EndTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = endTime });
-            }
-
-            // 3. 事件类型条件
-            if (!string.IsNullOrWhiteSpace(_eventType))
-            {
-                sqlBuilder.Append(" AND EventType = @EventType ");
-                parameters.Add(new NpgsqlParameter("@EventType", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = _eventType.Trim() });
-            }
-
-            // 4. 设备名称条件
-            if (!string.IsNullOrWhiteSpace(deviceName))
-            {
-                sqlBuilder.Append(" AND DeviceName = @DeviceName ");
-                parameters.Add(new NpgsqlParameter("@DeviceName", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = deviceName.Trim() });
-            }
-
-            // 排序（按事件时间降序，保证最新的记录在前）
-            sqlBuilder.Append(" ORDER BY EventTime DESC ");
-
-            // 分页（LIMIT限制条数，OFFSET偏移量）
-            sqlBuilder.Append(" LIMIT @PageSize OFFSET @Offset ");
-            parameters.Add(new NpgsqlParameter("@PageSize", NpgsqlTypes.NpgsqlDbType.Integer) { Value = pageSize });
-            parameters.Add(new NpgsqlParameter("@Offset", NpgsqlTypes.NpgsqlDbType.Integer) { Value = offset });
 
             // 执行查询并映射数据
             using (var conn = new NpgsqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
+                // 解析真实列名（兼容大小写/引号）
+                var idCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "id", "Id");
+                var eventTypeCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "eventtype", "EventType");
+                var eventTimeCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "eventtime", "EventTime");
+                var deviceNameCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "devicename", "DeviceName");
+                var channelNameCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "channelname", "ChannelName");
+                var taskNameCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "taskname", "TaskName");
+                var snapshotCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "snapshotbase64path", "SnapshotBase64Path");
+                var rawDataCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "rawdata", "RawData");
+
+                if (string.IsNullOrWhiteSpace(idCol) ||
+                    string.IsNullOrWhiteSpace(eventTypeCol) ||
+                    string.IsNullOrWhiteSpace(eventTimeCol) ||
+                    string.IsNullOrWhiteSpace(deviceNameCol) ||
+                    string.IsNullOrWhiteSpace(channelNameCol) ||
+                    string.IsNullOrWhiteSpace(taskNameCol))
+                {
+                    throw new Exception("hik_alarm_record 表结构缺失必要字段，请检查列名大小写是否一致");
+                }
+
+                var idExpr = QuoteIdentifierIfNeeded(idCol);
+                var eventTypeExpr = QuoteIdentifierIfNeeded(eventTypeCol);
+                var eventTimeExpr = QuoteIdentifierIfNeeded(eventTimeCol);
+                var deviceNameExpr = QuoteIdentifierIfNeeded(deviceNameCol);
+                var channelNameExpr = QuoteIdentifierIfNeeded(channelNameCol);
+                var taskNameExpr = QuoteIdentifierIfNeeded(taskNameCol);
+                var snapshotExpr = string.IsNullOrWhiteSpace(snapshotCol) ? "NULL" : QuoteIdentifierIfNeeded(snapshotCol);
+                var rawDataExpr = string.IsNullOrWhiteSpace(rawDataCol) ? "NULL" : QuoteIdentifierIfNeeded(rawDataCol);
+
+                // 构建SQL查询语句（动态拼接条件，参数化防注入）
+                var sqlBuilder = new System.Text.StringBuilder();
+                sqlBuilder.Append($@"
+                    SELECT {idExpr} AS ""Id"",
+                           {eventTypeExpr} AS ""EventType"",
+                           {eventTimeExpr} AS ""EventTime"",
+                           {deviceNameExpr} AS ""DeviceName"",
+                           {channelNameExpr} AS ""ChannelName"",
+                           {taskNameExpr} AS ""TaskName"",
+                           {snapshotExpr} AS ""SnapshotBase64Path"",
+                           {rawDataExpr} AS ""RawData""
+                    FROM hik_alarm_record
+                    WHERE 1=1 "); // 占位条件，方便拼接AND
+
+                // 1. 时间范围条件（开始时间）
+                if (!string.IsNullOrWhiteSpace(_startTime) && DateTime.TryParse(_startTime, out DateTime startTime))
+                {
+                    sqlBuilder.Append($" AND {eventTimeExpr} >= @StartTime ");
+                    parameters.Add(new NpgsqlParameter("@StartTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = startTime });
+                }
+
+                // 2. 时间范围条件（结束时间）
+                if (!string.IsNullOrWhiteSpace(_endTime) && DateTime.TryParse(_endTime, out DateTime endTime))
+                {
+                    sqlBuilder.Append($" AND {eventTimeExpr} <= @EndTime ");
+                    parameters.Add(new NpgsqlParameter("@EndTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = endTime });
+                }
+
+                // 3. 事件类型条件
+                if (!string.IsNullOrWhiteSpace(_eventType))
+                {
+                    sqlBuilder.Append($" AND {eventTypeExpr} = @EventType ");
+                    parameters.Add(new NpgsqlParameter("@EventType", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = _eventType.Trim() });
+                }
+
+                // 4. 设备名称条件
+                if (!string.IsNullOrWhiteSpace(deviceName))
+                {
+                    sqlBuilder.Append($" AND {deviceNameExpr} = @DeviceName ");
+                    parameters.Add(new NpgsqlParameter("@DeviceName", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = deviceName.Trim() });
+                }
+
+                // 排序（按事件时间降序，保证最新的记录在前）
+                sqlBuilder.Append($" ORDER BY {eventTimeExpr} DESC ");
+
+                // 分页（LIMIT限制条数，OFFSET偏移量）
+                sqlBuilder.Append(" LIMIT @PageSize OFFSET @Offset ");
+                parameters.Add(new NpgsqlParameter("@PageSize", NpgsqlTypes.NpgsqlDbType.Integer) { Value = pageSize });
+                parameters.Add(new NpgsqlParameter("@Offset", NpgsqlTypes.NpgsqlDbType.Integer) { Value = offset });
+
                 using (var cmd = new NpgsqlCommand(sqlBuilder.ToString(), conn))
                 {
                     cmd.Parameters.AddRange(parameters.ToArray());
@@ -182,6 +218,75 @@ namespace PostgreConfig
             }
 
             return resultDict;
+        }
+
+        /// <summary>
+        /// 获取符合条件的报警记录总数（不分页）
+        /// </summary>
+        public async Task<int> CountHikAlarmRecordAsync(
+            string _connectionString,
+            string? _startTime,
+            string? _endTime,
+            string? _eventType,
+            string? deviceName)
+        {
+            var parameters = new List<NpgsqlParameter>();
+            using (var conn = new NpgsqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                var eventTypeCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "eventtype", "EventType");
+                var eventTimeCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "eventtime", "EventTime");
+                var deviceNameCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "devicename", "DeviceName");
+
+                if (string.IsNullOrWhiteSpace(eventTypeCol) ||
+                    string.IsNullOrWhiteSpace(eventTimeCol) ||
+                    string.IsNullOrWhiteSpace(deviceNameCol))
+                {
+                    throw new Exception("hik_alarm_record 表结构缺失必要字段，请检查列名大小写是否一致");
+                }
+
+                var eventTypeExpr = QuoteIdentifierIfNeeded(eventTypeCol);
+                var eventTimeExpr = QuoteIdentifierIfNeeded(eventTimeCol);
+                var deviceNameExpr = QuoteIdentifierIfNeeded(deviceNameCol);
+
+                var sqlBuilder = new System.Text.StringBuilder();
+                sqlBuilder.Append($@"
+                    SELECT COUNT(*)
+                    FROM hik_alarm_record
+                    WHERE 1=1 ");
+
+                if (!string.IsNullOrWhiteSpace(_startTime) && DateTime.TryParse(_startTime, out DateTime startTime))
+                {
+                    sqlBuilder.Append($" AND {eventTimeExpr} >= @StartTime ");
+                    parameters.Add(new NpgsqlParameter("@StartTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = startTime });
+                }
+
+                if (!string.IsNullOrWhiteSpace(_endTime) && DateTime.TryParse(_endTime, out DateTime endTime))
+                {
+                    sqlBuilder.Append($" AND {eventTimeExpr} <= @EndTime ");
+                    parameters.Add(new NpgsqlParameter("@EndTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = endTime });
+                }
+
+                if (!string.IsNullOrWhiteSpace(_eventType))
+                {
+                    sqlBuilder.Append($" AND {eventTypeExpr} = @EventType ");
+                    parameters.Add(new NpgsqlParameter("@EventType", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = _eventType.Trim() });
+                }
+
+                if (!string.IsNullOrWhiteSpace(deviceName))
+                {
+                    sqlBuilder.Append($" AND {deviceNameExpr} = @DeviceName ");
+                    parameters.Add(new NpgsqlParameter("@DeviceName", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = deviceName.Trim() });
+                }
+
+                using (var cmd = new NpgsqlCommand(sqlBuilder.ToString(), conn))
+                {
+                    cmd.Parameters.AddRange(parameters.ToArray());
+                    var result = await cmd.ExecuteScalarAsync();
+                    return Convert.ToInt32(result);
+                }
+            }
         }
 
         /// <summary>
@@ -279,16 +384,27 @@ namespace PostgreConfig
         //]
         public async Task<List<AlarmCountDto>> GetAllAlarmRecordCountAsync(string _connectionString)
         {
-            var sql = @"
-                SELECT EventType, COUNT(*) AS Count
-                FROM hik_alarm_record
-                GROUP BY EventType;";
             var result = new List<AlarmCountDto>();
             try
             {
                 using(var conn = new NpgsqlConnection(_connectionString))
                 {
                     await conn.OpenAsync();
+                    var eventTypeColumn = await ResolveColumnNameAsync(
+                        conn,
+                        "hik_alarm_record",
+                        "eventtype",
+                        "EventType");
+                    if (string.IsNullOrWhiteSpace(eventTypeColumn))
+                    {
+                        throw new Exception("hik_alarm_record 表中未找到 EventType/eventtype 字段，请检查表结构");
+                    }
+
+                    var eventTypeExpr = QuoteIdentifierIfNeeded(eventTypeColumn);
+                    var sql = $@"
+                        SELECT {eventTypeExpr} AS ""EventType"", COUNT(*) AS ""Count""
+                        FROM hik_alarm_record
+                        GROUP BY {eventTypeExpr};";
                     using(var cmd = new NpgsqlCommand(sql, conn))
                     {
                         using(var reader = await cmd.ExecuteReaderAsync())
@@ -309,6 +425,35 @@ namespace PostgreConfig
                 throw new Exception("获取所有报警记录，查看不同事件的出现次数时发生异常：" + ex.Message);
             }
             return result;
+        }
+
+        private static async Task<string?> ResolveColumnNameAsync(
+            NpgsqlConnection conn,
+            string tableName,
+            params string[] candidates)
+        {
+            const string sql = @"
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = @TableName
+                  AND column_name = ANY(@Candidates)
+                LIMIT 1;";
+
+            using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@TableName", tableName);
+            cmd.Parameters.AddWithValue("@Candidates", candidates);
+            var result = await cmd.ExecuteScalarAsync();
+            return result?.ToString();
+        }
+
+        private static string QuoteIdentifierIfNeeded(string identifier)
+        {
+            if (identifier.Any(ch => char.IsUpper(ch) || ch == ' ' || ch == '-'))
+            {
+                return $"\"{identifier.Replace("\"", "\"\"")}\"";
+            }
+            return identifier;
         }
     }
 }

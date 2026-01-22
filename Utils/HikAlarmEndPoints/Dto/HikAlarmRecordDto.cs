@@ -61,4 +61,30 @@
         /// </summary>
         public int Value { get; set; }
     }
+
+    /// <summary>
+    /// 报警记录分页返回对象
+    /// </summary>
+    public class HikAlarmRecordPageDto
+    {
+        /// <summary>
+        /// 报警记录列表（数组，元素为字典）
+        /// </summary>
+        public List<Dictionary<string, HikAlarmRecordDto>> List { get; set; } = new List<Dictionary<string, HikAlarmRecordDto>>();
+
+        /// <summary>
+        /// 当前页码
+        /// </summary>
+        public int PageNum { get; set; }
+
+        /// <summary>
+        /// 每页大小
+        /// </summary>
+        public int PageSize { get; set; }
+
+        /// <summary>
+        /// 总记录数
+        /// </summary>
+        public int Total { get; set; }
+    }
 }

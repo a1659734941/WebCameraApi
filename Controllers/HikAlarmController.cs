@@ -84,7 +84,7 @@ namespace WebCameraApi.Controllers
         /// <param name="pageSize">页大小（默认15）</param>
         /// <returns>分页后的报警记录列表（EventType为中文）</returns>
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResponseDto<Dictionary<string, HikAlarmRecordDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto<HikAlarmRecordPageDto>), StatusCodes.Status200OK)]
         public IActionResult SelectAlarmInfomation(
             [FromQuery] string? startTime = null,
             [FromQuery] string? endTime = null,
@@ -100,12 +100,12 @@ namespace WebCameraApi.Controllers
                     startTime, endTime, eventType, deviceName, pageNumber, pageSize);
 
                 // 返回成功响应（带翻译后的中文EventType）
-                return Ok(ApiResponseDto<Dictionary<string, HikAlarmRecordDto>>.Success(result, "查询成功"));
+                return Ok(ApiResponseDto<HikAlarmRecordPageDto>.Success(result, "查询成功"));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.SelectAlarmInfomation 接口查询异常");
-                return Ok(ApiResponseDto<Dictionary<string, HikAlarmRecordDto>>.Fail("查询异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto<HikAlarmRecordPageDto>.Fail("查询异常（内部日志已记录）", 500));
             }
         }
         /// <summary>
