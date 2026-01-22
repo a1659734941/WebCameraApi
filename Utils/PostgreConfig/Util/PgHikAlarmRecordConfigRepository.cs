@@ -1,4 +1,4 @@
-﻿using HikAlarmEndPoints;
+using HikAlarmEndPoints;
 using Npgsql;
 using System;
 using System.Collections.Generic;
@@ -76,7 +76,7 @@ namespace PostgreConfig
         /// <param name="pageNumber"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        public async Task<Dictionary<string, HikAlarmRecordDto>> SelectHikAlarmRecordAsync(
+        public async Task<List<HikAlarmRecordDto>> SelectHikAlarmRecordAsync(
             string _connectionString,
             string? _startTime,
             string? _endTime,
@@ -86,7 +86,7 @@ namespace PostgreConfig
             int pageSize)
         {
             // 初始化返回结果
-            var resultDict = new Dictionary<string, HikAlarmRecordDto>();
+            var resultList = new List<HikAlarmRecordDto>();
 
             // 校验基础参数（避免无效分页）
             pageNumber = Math.Max(1, pageNumber);
@@ -189,7 +189,7 @@ namespace PostgreConfig
                         while (await reader.ReadAsync())
                         {
                             // 映射数据库字段到HikAlarmRecordDto
-                            var alarmDto = new HikAlarmRecordDto
+                            resultList.Add(new HikAlarmRecordDto
                             {
                                 Id = reader.GetGuid(reader.GetOrdinal("Id")), // 直接赋值 Guid 类型
                                 EventType = reader.GetString(reader.GetOrdinal("EventType")),
@@ -204,20 +204,13 @@ namespace PostgreConfig
                                 RawData = reader.IsDBNull(reader.GetOrdinal("RawData"))
                                     ? null
                                     : reader.GetString(reader.GetOrdinal("RawData"))
-                            };
-
-                            // 添加到字典（Id作为唯一键）
-                            string idStr = alarmDto.Id.ToString();
-                            if (!resultDict.ContainsKey(idStr))
-                            {
-                                resultDict.Add(idStr, alarmDto);
-                            }
+                            });
                         }
                     }
                 }
             }
 
-            return resultDict;
+            return resultList;
         }
 
         /// <summary>

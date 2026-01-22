@@ -1,4 +1,4 @@
-﻿using ConfigGet;
+using ConfigGet;
 using HikAlarmEndPoints;
 using Microsoft.AspNetCore.Hosting; // 核心：用于获取项目根目录
 using Microsoft.AspNetCore.Http;
@@ -69,39 +69,52 @@ namespace WebCameraApi.Services
 
         public async Task InitializeServiceAsync()
         {
-            try
+            int maxRetries = 3;
+            int delaySeconds = 5;
+
+            for (int i = 1; i <= maxRetries; i++)
             {
-                dynamic dbConfigDynamic = Appsettings_Get.GetConfigByKey("PostresSQLConfig");
-                if (dbConfigDynamic == null)
+                try
                 {
-                    _logger.LogError("未读取到PostresSQLConfig配置，HikAlarmService初始化失败");
-                    return;
+                    dynamic dbConfigDynamic = Appsettings_Get.GetConfigByKey("PostresSQLConfig");
+                    if (dbConfigDynamic == null)
+                    {
+                        _logger.LogError("未读取到PostresSQLConfig配置，HikAlarmService初始化失败");
+                        return;
+                    }
+
+                    PgConnectionOptions pgConnectionOptions = new PgConnectionOptions();
+                    pgConnectionOptions.Host = dbConfigDynamic.host;
+                    pgConnectionOptions.Port = dbConfigDynamic.port;
+                    pgConnectionOptions.Username = dbConfigDynamic.username;
+                    pgConnectionOptions.Password = dbConfigDynamic.password;
+                    pgConnectionOptions.Database = dbConfigDynamic.database;
+                    _connectionString = pgConnectionOptions.BuildConnectionString();
+
+                    var alarmBincRepository = new PgHikAlarmBindConfigRepository();
+                    var alarmBindList = await alarmBincRepository.GetAllHikAlarmBindsAsync(_connectionString);
+
+                    // 清空并批量写入并发字典
+                    _alarmBindDic.Clear();
+                    foreach (var item in alarmBindList)
+                    {
+                        _alarmBindDic.TryAdd(item.Key, item.Value);
+                    }
+
+                    _logger.LogInformation("HikAlarmService 初始化完成，加载绑定配置数：{ConfigCount}", _alarmBindDic.Count);
+                    return; // 成功则退出循环
                 }
-
-                PgConnectionOptions pgConnectionOptions = new PgConnectionOptions();
-                pgConnectionOptions.Host = dbConfigDynamic.host;
-                pgConnectionOptions.Port = dbConfigDynamic.port;
-                pgConnectionOptions.Username = dbConfigDynamic.username;
-                pgConnectionOptions.Password = dbConfigDynamic.password;
-                pgConnectionOptions.Database = dbConfigDynamic.database;
-                _connectionString = pgConnectionOptions.BuildConnectionString();
-
-                var alarmBincRepository = new PgHikAlarmBindConfigRepository();
-                var alarmBindList = await alarmBincRepository.GetAllHikAlarmBindsAsync(_connectionString);
-
-                // 清空并批量写入并发字典
-                _alarmBindDic.Clear();
-                foreach (var item in alarmBindList)
+                catch (Exception ex)
                 {
-                    _alarmBindDic.TryAdd(item.Key, item.Value);
-                }
+                    if (i == maxRetries)
+                    {
+                        _logger.LogError(ex, "HikAlarmService初始化在重试{MaxRetries}次后最终失败", maxRetries);
+                        throw;
+                    }
 
-                _logger.LogInformation("HikAlarmService 初始化完成，加载绑定配置数：{ConfigCount}", _alarmBindDic.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "HikAlarmService初始化失败");
-                throw; // 向上抛出，让启动流程感知初始化失败
+                    _logger.LogWarning("HikAlarmService初始化尝试第{Index}次失败: {Message}，将在{Delay}秒后重试...", i, ex.Message, delaySeconds);
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+                }
             }
         }
 
@@ -434,32 +447,26 @@ namespace WebCameraApi.Services
             pageNumber = Math.Max(1, pageNumber);
             pageSize = Math.Max(1, pageSize);
 
-            // 调用仓储层查询原始数据
-            var resultDict = _PgHikAlarmRecord.SelectHikAlarmRecordAsync(
+            // 调用仓储层查询原始数据（现在返回 List）
+            var resultList = _PgHikAlarmRecord.SelectHikAlarmRecordAsync(
                 _connectionString, _startTime, _endTime, _eventType, _deviceName, pageNumber, pageSize).Result;
 
             var total = _PgHikAlarmRecord.CountHikAlarmRecordAsync(
                 _connectionString, _startTime, _endTime, _eventType, _deviceName).Result;
 
             // 遍历结果，翻译EventType为中文
-            foreach (var key in resultDict.Keys.ToList()) // ToList避免遍历中修改集合
+            foreach (var dto in resultList)
             {
-                var dto = resultDict[key];
                 // 存在翻译映射则替换，否则保留原字符串
                 if (_eventTypeTransDict.TryGetValue(dto.EventType, out var chineseName))
                 {
                     dto.EventType = chineseName;
                 }
-                // 替换字典中的DTO（值类型为引用类型，直接修改即可，此处为显式赋值）
-                resultDict[key] = dto;
             }
 
-            var orderedList = resultDict
-                .OrderByDescending(item => item.Value.EventTime)
-                .Select(item => new Dictionary<string, HikAlarmRecordDto>
-                {
-                    { item.Key, item.Value }
-                })
+            // 按照时间倒序排序（仓储层 SQL 已排序，此处为双重保险）
+            var orderedList = resultList
+                .OrderByDescending(item => item.EventTime)
                 .ToList();
 
             return new HikAlarmRecordPageDto

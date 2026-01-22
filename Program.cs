@@ -2,7 +2,8 @@
 using Serilog;
 // 引入WebCameraApi项目中的服务层命名空间，包含自定义业务服务
 using WebCameraApi.Services;
-
+using System.Text;
+using System.Linq;
 // 定义WebCameraApi项目的根命名空间
 namespace WebCameraApi
 {
@@ -21,7 +22,8 @@ namespace WebCameraApi
         {
             // 创建Web应用程序构建器，负责配置应用的所有服务和中间件
             var builder = WebApplication.CreateBuilder(args);
-
+            Console.InputEncoding = Encoding.UTF8;
+            Console.OutputEncoding = Encoding.UTF8;
             #region Serilog 日志配置
             // 配置Serilog日志记录器，替代默认的Microsoft.Extensions.Logging
             Log.Logger = new LoggerConfiguration()
@@ -51,7 +53,24 @@ namespace WebCameraApi
                 // 如果配置了自定义URL，则使用该URL启动应用（替代默认的5000/5001端口）
                 if (!string.IsNullOrEmpty(customUrls))
                 {
-                    builder.WebHost.UseUrls(customUrls);
+                    var urls = customUrls
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(url => url.Trim())
+                        .Where(url => !string.IsNullOrWhiteSpace(url))
+                        .ToList();
+
+                    // 未配置证书时移除 https 监听，避免 Windows 下权限/证书绑定错误
+                    if (!HasHttpsCertificate(builder.Configuration))
+                    {
+                        urls = urls
+                            .Where(url => !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                    }
+
+                    if (urls.Count > 0)
+                    {
+                        builder.WebHost.UseUrls(string.Join(';', urls));
+                    }
                 }
             }
             #endregion
@@ -141,6 +160,13 @@ namespace WebCameraApi
 
             // 启动Web应用程序，开始监听HTTP请求
             app.Run();
+        }
+
+        private static bool HasHttpsCertificate(IConfiguration configuration)
+        {
+            var certPath = configuration["Kestrel:Certificates:Default:Path"];
+            var certPassword = configuration["Kestrel:Certificates:Default:Password"];
+            return !string.IsNullOrWhiteSpace(certPath) && !string.IsNullOrWhiteSpace(certPassword);
         }
     }
 }

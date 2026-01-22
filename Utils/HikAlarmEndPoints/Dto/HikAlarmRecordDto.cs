@@ -1,4 +1,4 @@
-﻿namespace HikAlarmEndPoints
+namespace HikAlarmEndPoints
 {
     /// <summary>
     /// 报警记录表的数据传输对象（DTO）
@@ -68,9 +68,9 @@
     public class HikAlarmRecordPageDto
     {
         /// <summary>
-        /// 报警记录列表（数组，元素为字典）
+        /// 报警记录列表（数组）
         /// </summary>
-        public List<Dictionary<string, HikAlarmRecordDto>> List { get; set; } = new List<Dictionary<string, HikAlarmRecordDto>>();
+        public List<HikAlarmRecordDto> List { get; set; } = new List<HikAlarmRecordDto>();
 
         /// <summary>
         /// 当前页码
