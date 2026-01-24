@@ -126,6 +126,92 @@ dotnet run --environment Production
 打包.bat
 ```
 
+### 7. 海康摄像头推送配置（关键）
+
+本项目包含两个海康推送接口：**人数计数**（摄像头推送）与 **行为分析**（摄像头/分析服务器推送）。下面步骤必须逐条完成，确保请求能被系统识别并写入数据库。
+
+#### 7.1 准备 API 服务地址
+
+1. **确定服务监听地址**
+   - 开发环境：`Properties/launchSettings.json` 中 `applicationUrl`（默认 `http://localhost:5283`）
+   - 生产环境：`appsettings.Production.json` 中 `Urls`（默认 `http://0.0.0.0:12345`）
+2. **确认设备能访问 API**
+   - 摄像头或行为分析服务器必须能访问 `http://{API服务器IP}:{端口}`
+   - 若有防火墙/安全组，需放行 API 端口（默认 5283 或 12345）
+
+#### 7.2 配置摄像头人数计数推送（CountingCamera）
+
+1. **登录摄像头 Web 管理界面**
+2. 进入「事件配置 / 人数统计 / 事件联动 / HTTP 通知」（不同型号名称略有差异）
+3. **启用 HTTP 推送**
+4. **填写推送地址**
+   - `http://{API服务器IP}:{端口}/api/HikAlarm/CountingCamera`
+5. **请求方法与格式**
+   - 方法：`POST`
+   - 内容类型：`application/x-www-form-urlencoded` 或 `multipart/form-data`
+6. **字段名必须是** `personQueueCounting`
+7. **JSON 结构必须包含以下层级**
+```json
+{
+  "RegionCapture": {
+    "humanCounting": {
+      "count": 2
+    }
+  }
+}
+```
+8. **绑定关系必须存在**
+   - 系统通过请求源 IP（Remote IP）匹配 `hik_alarm_bind.AlarmCameraIP`
+   - 若摄像头经由代理/NAT 转发，Remote IP 会变化，需确保数据库记录与实际来源 IP 一致
+
+#### 7.3 配置行为分析推送（BehaviorAnalysisJson）
+
+1. **登录摄像头或行为分析服务器的配置界面**
+2. 进入「行为分析 / 事件联动 / HTTP 通知」
+3. **启用 HTTP 推送**
+4. **填写推送地址**
+   - `http://{API服务器IP}:{端口}/api/HikAlarm/BehaviorAnalysisJson`
+5. **请求方法与格式**
+   - 方法：`POST`
+   - 内容类型：`application/json`
+6. **事件类型（eventType）**
+   - `uniformDetection`（制服检测）
+   - `peopleNumCounting`（人数统计）
+   - `overtimeTarry`（超时逗留）
+   - `standUp`（起立检测）
+   - `advReachHeight`（攀高检测）
+7. **JSON 结构必须包含**
+```json
+{
+  "eventType": "uniformDetection",
+  "dateTime": "2026-01-24T10:30:00",
+  "targetAttrs": {
+    "deviceName": "摄像头1",
+    "channelName": "通道1",
+    "taskname": "制服检测任务"
+  },
+  "UniformDetection": {
+    "BackgroundImage": {
+      "resourcesContent": "http://camera-ip/path/to/image.jpg"
+    }
+  }
+}
+```
+**注意**：`eventType` 的值必须与对象名大小写对应（例如 `uniformDetection` 对应 `UniformDetection`）。
+
+#### 7.4 绑定配置与联动目标
+
+1. **绑定表 `hik_alarm_bind` 必须有对应记录**
+2. `AlarmCameraIP` = 摄像头实际推送请求的来源 IP
+3. `BlockComputerIP` = 需要接收锁定/解锁的电脑 IP
+4. 目标电脑需开放 `7410` 端口，并提供 `/blockinput` 接口
+
+#### 7.5 网络与防火墙检查
+
+1. 摄像头/分析服务器 → API 服务器：开放 API 端口
+2. API 服务器 → 目标电脑：开放 `7410` 端口
+3. API 服务器 → 摄像头图片地址：允许下载报警图片
+
 ## API 接口文档
 
 ### 1. 摄像头 RTSP 接口
@@ -169,6 +255,56 @@ Content-Type: application/json
 "摄像头1"
 ```
 
+#### 批量添加/更新摄像头配置（POST）
+
+**接口地址**：`/api/CameraRtsp/BatchAddConfig`
+
+**请求方法**：POST
+
+**请求方式**：JSON 数组
+
+**说明**：
+- 以 `CameraName` 作为主键，若已存在则更新
+- 成功条数 = 校验通过的条数
+
+**请求示例**：
+```json
+[
+  {
+    "CameraName": "审讯室1",
+    "CameraIP": "192.168.1.101",
+    "CameraUser": "admin",
+    "CameraPassword": "password",
+    "CameraPort": 80,
+    "CameraRetryCount": 3,
+    "CameraWaitmillisecounds": 1000
+  },
+  {
+    "CameraName": "审讯室2",
+    "CameraIP": "192.168.1.102",
+    "CameraUser": "admin",
+    "CameraPassword": "password",
+    "CameraPort": 80,
+    "CameraRetryCount": 3,
+    "CameraWaitmillisecounds": 1000
+  }
+]
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "message": "批量摄像头配置处理完成",
+  "data": {
+    "total": 2,
+    "success": 2,
+    "failed": 0,
+    "errors": []
+  }
+}
+```
+
 ### 2. 门禁控制接口
 
 #### 开启门禁
@@ -199,6 +335,56 @@ GET /api/HikAC/openHikAC?acIp=192.168.1.200
   "message": "门禁 : 门禁1开门成功!",
   "data": {
     "acName": "门禁1"
+  }
+}
+```
+
+#### 批量添加/更新门禁配置（POST）
+
+**接口地址**：`/api/HikAC/BatchAddConfig`
+
+**请求方法**：POST
+
+**请求方式**：JSON 数组
+
+**说明**：
+- 以 `HikAcName` 作为主键，若已存在则更新
+- 成功条数 = 校验通过的条数
+
+**请求示例**：
+```json
+[
+  {
+    "HikAcName": "门禁1",
+    "HikAcIP": "192.168.1.201",
+    "HikAcUser": "admin",
+    "HikAcPassword": "password",
+    "HikAcPort": 8000,
+    "HikAcRetryCount": 3,
+    "HikAcWaitmillisecounds": 1000
+  },
+  {
+    "HikAcName": "门禁2",
+    "HikAcIP": "192.168.1.202",
+    "HikAcUser": "admin",
+    "HikAcPassword": "password",
+    "HikAcPort": 8000,
+    "HikAcRetryCount": 3,
+    "HikAcWaitmillisecounds": 1000
+  }
+]
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "message": "批量门禁配置处理完成",
+  "data": {
+    "total": 2,
+    "success": 2,
+    "failed": 0,
+    "errors": []
   }
 }
 ```
@@ -352,8 +538,9 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
-| key | VARCHAR | 键（IP 地址） |
-| value | JSON | 值（包含 BlockComputerIP 等） |
+| AlarmCameraIP | VARCHAR | 摄像头 IP（主键，用于匹配请求来源） |
+| BlockComputerIP | VARCHAR | 目标电脑 IP（接收锁定/解锁） |
+| HikAlarmCameraRoomName | VARCHAR | 关联房间/名称（可选） |
 
 ### 报警记录表（hik_alarm_record）
 
@@ -381,7 +568,7 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 
 项目启动后，访问以下地址查看 Swagger API 文档：
 
-- 开发环境：`http://localhost:5000/swagger`
+- 开发环境：`http://localhost:5283/swagger` 或 `https://localhost:7203/swagger`
 - 生产环境：`http://0.0.0.0:12345/swagger`
 
 ## 项目结构
@@ -438,7 +625,7 @@ WebCameraApi/
 1. **海康威视 SDK**：项目依赖海康威视 SDK 文件，请确保 `res/lib` 目录下的所有 DLL 文件完整，包括 `HCNetSDK.dll`、`PlayCtrl.dll` 等
 2. **数据库配置**：请根据实际环境修改 `appsettings.json` 中的数据库连接信息（host、database、username、password、port）
 3. **端口配置**：
-   - 开发环境：默认使用 5000（HTTP）和 5001（HTTPS）端口
+   - 开发环境：默认使用 5283（HTTP）和 7203（HTTPS）端口
    - 生产环境：默认使用 12345（HTTP）和 54321（HTTPS）端口
    - 可在 `appsettings.Production.json` 中修改 `Urls` 配置
 4. **HTTPS 重定向**：项目默认启用 HTTPS 重定向，生产环境请配置 SSL 证书
@@ -453,6 +640,10 @@ WebCameraApi/
 10. **并发处理**：报警服务使用并发安全字典处理高并发场景，确保数据一致性
 11. **事件类型翻译**：报警记录查询会自动将英文事件类型翻译为中文（如 `uniformDetection` → `制服检测`）
 12. **容器化支持**：项目支持 Docker 容器化部署，配置了 `ContainerBaseImage` 和 `ContainerPort`
+13. **来源 IP 依赖**：人数计数接口依赖请求来源 IP 进行绑定匹配，若经反向代理或 NAT 转发，需确保 Remote IP 与 `AlarmCameraIP` 一致
+14. **图片可访问性**：行为分析接口会下载 `resourcesContent` 的图片 URL，要求 API 服务器能直接访问该 URL（若需要鉴权需改造代码）
+15. **绑定配置加载**：`hik_alarm_bind` 绑定信息在服务启动时加载，数据库修改后需重启服务生效
+16. **人数阈值固定**：人数计数阈值当前固定为 `< 3` 触发锁定，如需可配置化需调整代码
 
 ## 许可证
 
@@ -483,8 +674,8 @@ VALUES (gen_random_uuid(), '新门禁', '192.168.1.200', 8000, 'admin', 'passwor
 在 PostgreSQL 数据库的 `hik_alarm_bind` 表中插入绑定配置：
 
 ```sql
-INSERT INTO hik_alarm_bind (key, value)
-VALUES ('192.168.1.100', '{"BlockComputerIP":"192.168.1.50"}');
+INSERT INTO hik_alarm_bind (AlarmCameraIP, BlockComputerIP, HikAlarmCameraRoomName)
+VALUES ('192.168.1.100', '192.168.1.50', '审讯室1');
 ```
 
 ### 4. 如何查看日志？
@@ -545,7 +736,7 @@ VALUES ('192.168.1.100', '{"BlockComputerIP":"192.168.1.50"}');
 2. 配置 `appsettings.json` 中的数据库连接
 3. 运行 `dotnet restore` 恢复依赖
 4. 运行 `dotnet run` 启动开发服务器
-5. 访问 `http://localhost:5000/swagger` 查看 API 文档
+5. 访问 `http://localhost:5283/swagger` 查看 API 文档
 
 ### 调试
 

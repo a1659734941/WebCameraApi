@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -93,6 +93,64 @@ namespace HikAcessControl  // 与Dto类保持相同的命名空间
             }
 
             return hikAcInfomations;
+        }
+
+        /// <summary>
+        /// 批量新增/更新门禁配置（按HikAcName主键）
+        /// </summary>
+        public async Task<int> UpsertHikAcInfomationsAsync(string _connectionString, IEnumerable<HikAcInfomationDto> configs)
+        {
+            if (configs == null)
+            {
+                return 0;
+            }
+
+            var sql = @"
+                INSERT INTO hikac_config
+                (HikAcName, HikAcIP, HikAcUser, HikAcPassword, HikAcPort, HikAcRetryCount, HikAcWaitmillisecounds)
+                VALUES
+                (@HikAcName, @HikAcIP, @HikAcUser, @HikAcPassword, @HikAcPort, @HikAcRetryCount, @HikAcWaitmillisecounds)
+                ON CONFLICT (HikAcName) DO UPDATE SET
+                    HikAcIP = EXCLUDED.HikAcIP,
+                    HikAcUser = EXCLUDED.HikAcUser,
+                    HikAcPassword = EXCLUDED.HikAcPassword,
+                    HikAcPort = EXCLUDED.HikAcPort,
+                    HikAcRetryCount = EXCLUDED.HikAcRetryCount,
+                    HikAcWaitmillisecounds = EXCLUDED.HikAcWaitmillisecounds;";
+
+            var count = 0;
+            using (var conn = new NpgsqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                using (var tx = await conn.BeginTransactionAsync())
+                using (var cmd = new NpgsqlCommand(sql, conn, tx))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcName", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcIP", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcUser", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcPassword", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcPort", NpgsqlTypes.NpgsqlDbType.Integer));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcRetryCount", NpgsqlTypes.NpgsqlDbType.Integer));
+                    cmd.Parameters.Add(new NpgsqlParameter("HikAcWaitmillisecounds", NpgsqlTypes.NpgsqlDbType.Integer));
+
+                    foreach (var config in configs)
+                    {
+                        cmd.Parameters["HikAcName"].Value = config.HikAcName;
+                        cmd.Parameters["HikAcIP"].Value = config.HikAcIP;
+                        cmd.Parameters["HikAcUser"].Value = config.HikAcUser;
+                        cmd.Parameters["HikAcPassword"].Value = config.HikAcPassword;
+                        cmd.Parameters["HikAcPort"].Value = config.HikAcPort;
+                        cmd.Parameters["HikAcRetryCount"].Value = config.HikAcRetryCount;
+                        cmd.Parameters["HikAcWaitmillisecounds"].Value = config.HikAcWaitmillisecounds;
+
+                        count += await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                }
+            }
+
+            return count;
         }
 
         /// <summary>

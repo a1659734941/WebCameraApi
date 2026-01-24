@@ -105,10 +105,6 @@ namespace WebCameraApi
             #endregion
 
             #region 依赖注入服务注册
-            // 注册海康报警服务（HikAlarmService）为Scoped生命周期
-            // Scoped：每个HTTP请求创建一个新的服务实例
-            builder.Services.AddScoped<WebCameraApi.Services.HikAlarmService>();
-
             // 将Serilog集成到ASP.NET Core的日志系统中，替代默认日志提供程序
             builder.Host.UseSerilog();
 
@@ -127,7 +123,8 @@ namespace WebCameraApi
             // 注册海康AC服务为Scoped生命周期
             builder.Services.AddScoped<HikAcService>();
 
-            // 再次注册海康报警服务（注：此处重复注册，可根据实际需求保留一个）
+            // 注册海康报警服务（HikAlarmService）为Scoped生命周期
+            // Scoped：每个HTTP请求创建一个新的服务实例
             builder.Services.AddScoped<HikAlarmService>();
             #endregion
 
@@ -148,11 +145,11 @@ namespace WebCameraApi
             // 启用HTTPS重定向中间件，将HTTP请求重定向到HTTPS
             app.UseHttpsRedirection();
 
-            // 启用授权中间件，处理基于策略的授权
-            app.UseAuthorization();
-
             // 启用路由中间件，解析请求URL并匹配到对应的控制器/动作
             app.UseRouting();
+
+            // 启用授权中间件，处理基于策略的授权
+            app.UseAuthorization();
 
             // 映射控制器路由，将请求路由到对应的控制器和动作方法
             app.MapControllers();

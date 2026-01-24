@@ -1,9 +1,10 @@
-﻿using ConfigGet;
+using ConfigGet;
 using Onvif_GetPhoto.DTO;
 using Onvif_GetPhoto.Util;
 using PostgreConfig;
 using Serilog;
 using System.Text;
+using System.Linq;
 using WebCameraApi.Dto;
 
 namespace WebCameraApi.Services
@@ -12,6 +13,7 @@ namespace WebCameraApi.Services
     {
         private Dictionary<string, OnvifCameraInfomation> cameraConfigs = new Dictionary<string, OnvifCameraInfomation>();
         private readonly ILogger<CameraRtspService> _logger;
+        private string _connectionString;
 
         public CameraRtspService(ILogger<CameraRtspService> logger)
         {
@@ -31,7 +33,7 @@ namespace WebCameraApi.Services
                 pgConnectionOptions.Username = dbConfigDynamic.username;
                 pgConnectionOptions.Password = dbConfigDynamic.password;
                 pgConnectionOptions.Database = dbConfigDynamic.database;
-                string _connectionString = pgConnectionOptions.BuildConnectionString();
+                _connectionString = pgConnectionOptions.BuildConnectionString();
                 // 实例化仓储类（自动拼接连接字符串）
                 var repository = new PgOnvifCameraInfomationRepository();
 
@@ -48,6 +50,33 @@ namespace WebCameraApi.Services
             {
                 _logger.LogError(ex, "CameraConfigSql 初始化失败");
             }
+        }
+
+        public async Task<int> BatchUpsertCameraConfigsAsync(IEnumerable<OnvifCameraInfomation> configs)
+        {
+            if (configs == null || !configs.Any())
+            {
+                return 0;
+            }
+
+            if (string.IsNullOrWhiteSpace(_connectionString))
+            {
+                dynamic dbConfigDynamic = Appsettings_Get.GetConfigByKey("PostresSQLConfig");
+                PgConnectionOptions pgConnectionOptions = new PgConnectionOptions();
+                pgConnectionOptions.Host = dbConfigDynamic.host;
+                pgConnectionOptions.Port = dbConfigDynamic.port;
+                pgConnectionOptions.Username = dbConfigDynamic.username;
+                pgConnectionOptions.Password = dbConfigDynamic.password;
+                pgConnectionOptions.Database = dbConfigDynamic.database;
+                _connectionString = pgConnectionOptions.BuildConnectionString();
+            }
+
+            var repository = new PgOnvifCameraInfomationRepository();
+            await repository.CreateTableIfNotExistsAsync(_connectionString);
+            var count = await repository.UpsertOnvifCameraInfomationsAsync(_connectionString, configs);
+
+            cameraConfigs = await repository.GetAllOnvifCameraInfomationsAsync(_connectionString);
+            return count;
         }
 
         public async Task<(CameraRtspResponse response, CameraRtspResponse.StatusInfo status)> GetSingleRtspUri(string cameraName)

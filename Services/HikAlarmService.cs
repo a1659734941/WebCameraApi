@@ -92,6 +92,7 @@ namespace WebCameraApi.Services
                     _connectionString = pgConnectionOptions.BuildConnectionString();
 
                     var alarmBincRepository = new PgHikAlarmBindConfigRepository();
+                    await alarmBincRepository.CreateTableIfNotExistsAsync(_connectionString);
                     var alarmBindList = await alarmBincRepository.GetAllHikAlarmBindsAsync(_connectionString);
 
                     // 清空并批量写入并发字典

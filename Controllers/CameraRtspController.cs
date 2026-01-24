@@ -1,6 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WebCameraApi.Dto;
 using WebCameraApi.Services;
+using PostgreConfig;
+using System.Collections.Generic;
+using System.Linq;
+using System;
 
 namespace WebCameraApi.Controllers
 {
@@ -61,6 +65,75 @@ namespace WebCameraApi.Controllers
             {
                 return BadRequest(ApiResponseDto<CameraRtspResponse>.Fail(status.Message, 400));
             }
+        }
+
+        [HttpPost("BatchAddConfig")]
+        public async Task<IActionResult> BatchAddConfig([FromBody] List<CameraConfigDto> configs)
+        {
+            if (configs == null || configs.Count == 0)
+            {
+                return BadRequest(ApiResponseDto.Fail("批量摄像头配置不能为空", 400));
+            }
+
+            var result = new BatchImportResultDto { Total = configs.Count };
+            var validList = new List<OnvifCameraInfomation>();
+
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var item = configs[i];
+                var errors = ValidateCameraConfig(item);
+                if (errors.Count > 0)
+                {
+                    foreach (var err in errors)
+                    {
+                        result.Errors.Add($"第{i + 1}条：{err}");
+                    }
+                    continue;
+                }
+
+                validList.Add(new OnvifCameraInfomation
+                {
+                    CameraName = item.CameraName.Trim(),
+                    CameraIP = item.CameraIP.Trim(),
+                    CameraUser = item.CameraUser.Trim(),
+                    CameraPassword = item.CameraPassword,
+                    CameraPort = item.CameraPort,
+                    CameraRetryCount = item.CameraRetryCount,
+                    CameraWaitmillisecounds = item.CameraWaitmillisecounds
+                });
+            }
+
+            try
+            {
+                await _cameraRtspService.BatchUpsertCameraConfigsAsync(validList);
+                result.Success = validList.Count;
+                result.Failed = result.Total - result.Success;
+                return Ok(ApiResponseDto<BatchImportResultDto>.Success(result, "批量摄像头配置处理完成"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "批量摄像头配置写入数据库失败");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    ApiResponseDto<BatchImportResultDto>.Fail("批量摄像头配置写入数据库失败", 500));
+            }
+        }
+
+        private static List<string> ValidateCameraConfig(CameraConfigDto item)
+        {
+            var errors = new List<string>();
+            if (item == null)
+            {
+                errors.Add("对象为空");
+                return errors;
+            }
+            if (string.IsNullOrWhiteSpace(item.CameraName)) errors.Add("CameraName不能为空");
+            if (string.IsNullOrWhiteSpace(item.CameraIP)) errors.Add("CameraIP不能为空");
+            if (string.IsNullOrWhiteSpace(item.CameraUser)) errors.Add("CameraUser不能为空");
+            if (string.IsNullOrWhiteSpace(item.CameraPassword)) errors.Add("CameraPassword不能为空");
+            if (item.CameraPort <= 0) errors.Add("CameraPort必须大于0");
+            if (item.CameraRetryCount < 0) errors.Add("CameraRetryCount不能为负数");
+            if (item.CameraWaitmillisecounds < 0) errors.Add("CameraWaitmillisecounds不能为负数");
+            return errors;
         }
     }
 }

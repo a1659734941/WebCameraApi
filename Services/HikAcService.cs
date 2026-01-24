@@ -1,9 +1,10 @@
-﻿using ConfigGet;
+using ConfigGet;
 using HikAcessControl;
 using PostgreConfig;
 using Serilog;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 using WebCameraApi.Dto;
 
 namespace WebCameraApi.Services
@@ -12,6 +13,7 @@ namespace WebCameraApi.Services
     {
         private Dictionary<string, HikAcInfomationDto> HikAcConfigs = new Dictionary<string, HikAcInfomationDto>();
         private readonly ILogger<HikAcService> _logger;
+        private string _connectionString;
 
         public HikAcService(ILogger<HikAcService> logger)
         {
@@ -31,7 +33,7 @@ namespace WebCameraApi.Services
                 pgConnectionOptions.Username = dbConfigDynamic.username;
                 pgConnectionOptions.Password = dbConfigDynamic.password;
                 pgConnectionOptions.Database = dbConfigDynamic.database;
-                string _connectionString = pgConnectionOptions.BuildConnectionString();
+                _connectionString = pgConnectionOptions.BuildConnectionString();
                 // 实例化仓储类（自动拼接连接字符串）
                 var repository = new PgHikAccessControlRepository();
 
@@ -47,6 +49,33 @@ namespace WebCameraApi.Services
             {
                 _logger.LogError(ex, "CameraConfigSql 初始化失败");
             }
+        }
+
+        public async Task<int> BatchUpsertHikAcConfigsAsync(IEnumerable<HikAcInfomationDto> configs)
+        {
+            if (configs == null || !configs.Any())
+            {
+                return 0;
+            }
+
+            if (string.IsNullOrWhiteSpace(_connectionString))
+            {
+                dynamic dbConfigDynamic = Appsettings_Get.GetConfigByKey("PostresSQLConfig");
+                PgConnectionOptions pgConnectionOptions = new PgConnectionOptions();
+                pgConnectionOptions.Host = dbConfigDynamic.host;
+                pgConnectionOptions.Port = dbConfigDynamic.port;
+                pgConnectionOptions.Username = dbConfigDynamic.username;
+                pgConnectionOptions.Password = dbConfigDynamic.password;
+                pgConnectionOptions.Database = dbConfigDynamic.database;
+                _connectionString = pgConnectionOptions.BuildConnectionString();
+            }
+
+            var repository = new PgHikAccessControlRepository();
+            await repository.CreateTableIfNotExistsAsync(_connectionString);
+            var count = await repository.UpsertHikAcInfomationsAsync(_connectionString, configs);
+
+            HikAcConfigs = await repository.GetAllHikAcInfomationsAsync(_connectionString);
+            return count;
         }
 
         public async Task<(AcResponseDto response, StatusDto status)> OpenHikAccessGetway(string AcName = null, string AcIp = null)

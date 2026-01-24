@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WebCameraApi.Services;
 using WebCameraApi.Dto;
 using Serilog;
+using PostgreConfig;
+using System.Collections.Generic;
+using System;
 
 namespace WebCameraApi.Controllers
 {
@@ -57,6 +60,75 @@ namespace WebCameraApi.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     ApiResponseDto.Fail($"{errorMsg}，错误详情：{ex.Message}", 500));
             }
+        }
+
+        [HttpPost("BatchAddConfig")]
+        public async Task<IActionResult> BatchAddConfig([FromBody] List<HikAcBatchConfigDto> configs)
+        {
+            if (configs == null || configs.Count == 0)
+            {
+                return BadRequest(ApiResponseDto.Fail("批量门禁配置不能为空", 400));
+            }
+
+            var result = new BatchImportResultDto { Total = configs.Count };
+            var validList = new List<HikAcInfomationDto>();
+
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var item = configs[i];
+                var errors = ValidateHikAcConfig(item);
+                if (errors.Count > 0)
+                {
+                    foreach (var err in errors)
+                    {
+                        result.Errors.Add($"第{i + 1}条：{err}");
+                    }
+                    continue;
+                }
+
+                validList.Add(new HikAcInfomationDto
+                {
+                    HikAcName = item.HikAcName.Trim(),
+                    HikAcIP = item.HikAcIP.Trim(),
+                    HikAcUser = item.HikAcUser.Trim(),
+                    HikAcPassword = item.HikAcPassword,
+                    HikAcPort = item.HikAcPort,
+                    HikAcRetryCount = item.HikAcRetryCount,
+                    HikAcWaitmillisecounds = item.HikAcWaitmillisecounds
+                });
+            }
+
+            try
+            {
+                await _hikAcService.BatchUpsertHikAcConfigsAsync(validList);
+                result.Success = validList.Count;
+                result.Failed = result.Total - result.Success;
+                return Ok(ApiResponseDto<BatchImportResultDto>.Success(result, "批量门禁配置处理完成"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "批量门禁配置写入数据库失败");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    ApiResponseDto<BatchImportResultDto>.Fail("批量门禁配置写入数据库失败", 500));
+            }
+        }
+
+        private static List<string> ValidateHikAcConfig(HikAcBatchConfigDto item)
+        {
+            var errors = new List<string>();
+            if (item == null)
+            {
+                errors.Add("对象为空");
+                return errors;
+            }
+            if (string.IsNullOrWhiteSpace(item.HikAcName)) errors.Add("HikAcName不能为空");
+            if (string.IsNullOrWhiteSpace(item.HikAcIP)) errors.Add("HikAcIP不能为空");
+            if (string.IsNullOrWhiteSpace(item.HikAcUser)) errors.Add("HikAcUser不能为空");
+            if (string.IsNullOrWhiteSpace(item.HikAcPassword)) errors.Add("HikAcPassword不能为空");
+            if (item.HikAcPort <= 0) errors.Add("HikAcPort必须大于0");
+            if (item.HikAcRetryCount < 0) errors.Add("HikAcRetryCount不能为负数");
+            if (item.HikAcWaitmillisecounds < 0) errors.Add("HikAcWaitmillisecounds不能为负数");
+            return errors;
         }
     }
 }

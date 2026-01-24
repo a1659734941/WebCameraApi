@@ -18,7 +18,7 @@ namespace PostgreConfig
                 CREATE TABLE IF NOT EXISTS hik_alarm_bind (
                     AlarmCameraIP VARCHAR(50) PRIMARY KEY,  
                     BlockComputerIP VARCHAR(50) NOT NULL,
-                    HikAlarmCameraRoomName VARCHAR(50),
+                    HikAlarmCameraRoomName VARCHAR(50)
                 );";
 
             using (var conn = new NpgsqlConnection(_connectionString))

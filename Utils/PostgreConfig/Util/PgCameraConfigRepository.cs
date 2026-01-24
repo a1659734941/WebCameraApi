@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Npgsql;
@@ -87,6 +87,64 @@ namespace PostgreConfig
             }
 
             return OnvifCameraInfomations;
+        }
+
+        /// <summary>
+        /// 批量新增/更新摄像头配置（按CameraName主键）
+        /// </summary>
+        public async Task<int> UpsertOnvifCameraInfomationsAsync(string _connectionString, IEnumerable<OnvifCameraInfomation> configs)
+        {
+            if (configs == null)
+            {
+                return 0;
+            }
+
+            var sql = @"
+                INSERT INTO camera_config
+                (CameraName, CameraIP, CameraUser, CameraPassword, CameraPort, CameraRetryCount, CameraWaitmillisecounds)
+                VALUES
+                (@CameraName, @CameraIP, @CameraUser, @CameraPassword, @CameraPort, @CameraRetryCount, @CameraWaitmillisecounds)
+                ON CONFLICT (CameraName) DO UPDATE SET
+                    CameraIP = EXCLUDED.CameraIP,
+                    CameraUser = EXCLUDED.CameraUser,
+                    CameraPassword = EXCLUDED.CameraPassword,
+                    CameraPort = EXCLUDED.CameraPort,
+                    CameraRetryCount = EXCLUDED.CameraRetryCount,
+                    CameraWaitmillisecounds = EXCLUDED.CameraWaitmillisecounds;";
+
+            var count = 0;
+            using (var conn = new NpgsqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                using (var tx = await conn.BeginTransactionAsync())
+                using (var cmd = new NpgsqlCommand(sql, conn, tx))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraName", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraIP", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraUser", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraPassword", NpgsqlTypes.NpgsqlDbType.Varchar));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraPort", NpgsqlTypes.NpgsqlDbType.Integer));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraRetryCount", NpgsqlTypes.NpgsqlDbType.Integer));
+                    cmd.Parameters.Add(new NpgsqlParameter("CameraWaitmillisecounds", NpgsqlTypes.NpgsqlDbType.Integer));
+
+                    foreach (var config in configs)
+                    {
+                        cmd.Parameters["CameraName"].Value = config.CameraName;
+                        cmd.Parameters["CameraIP"].Value = config.CameraIP;
+                        cmd.Parameters["CameraUser"].Value = config.CameraUser;
+                        cmd.Parameters["CameraPassword"].Value = config.CameraPassword;
+                        cmd.Parameters["CameraPort"].Value = config.CameraPort;
+                        cmd.Parameters["CameraRetryCount"].Value = config.CameraRetryCount;
+                        cmd.Parameters["CameraWaitmillisecounds"].Value = config.CameraWaitmillisecounds;
+
+                        count += await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                }
+            }
+
+            return count;
         }
     }
 }
