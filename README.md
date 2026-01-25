@@ -15,7 +15,7 @@ WebCameraApi 是一个基于 .NET 8.0 的 Web API 项目，用于集成和管理
 
 ### 2. 海康门禁控制
 - 通过门禁名称或 IP 地址控制门禁开门
-- 从 PostgreSQL 数据库读取门禁配置
+- 前端调用开门接口时直接传入门禁信息
 - 使用海康威视 SDK 控制门禁
 - 支持多种门禁设备管理
 
@@ -311,21 +311,20 @@ Content-Type: application/json
 
 **接口地址**：`/api/HikAC/openHikAC`
 
-**请求参数**：
-- `acName`（可选）：门禁名称
-- `acIp`（可选）：门禁 IP 地址
-
-**注意**：`acName` 和 `acIp` 至少传入一个
+**请求方式**：JSON
 
 **请求示例**：
-```
-GET /api/HikAC/openHikAC?acName=门禁1
-```
+```json
+POST /api/HikAC/openHikAC
+Content-Type: application/json
 
-或
-
-```
-GET /api/HikAC/openHikAC?acIp=192.168.1.200
+{
+  "HikAcIP": "192.168.1.200",
+  "HikAcPort": 8000,
+  "HikAcUserName": "admin",
+  "HikAcPassword": "password",
+  "AcName": "门禁1"
+}
 ```
 
 **响应示例**：
@@ -339,55 +338,6 @@ GET /api/HikAC/openHikAC?acIp=192.168.1.200
 }
 ```
 
-#### 批量添加/更新门禁配置（POST）
-
-**接口地址**：`/api/HikAC/BatchAddConfig`
-
-**请求方法**：POST
-
-**请求方式**：JSON 数组
-
-**说明**：
-- 以 `HikAcName` 作为主键，若已存在则更新
-- 成功条数 = 校验通过的条数
-
-**请求示例**：
-```json
-[
-  {
-    "HikAcName": "门禁1",
-    "HikAcIP": "192.168.1.201",
-    "HikAcUser": "admin",
-    "HikAcPassword": "password",
-    "HikAcPort": 8000,
-    "HikAcRetryCount": 3,
-    "HikAcWaitmillisecounds": 1000
-  },
-  {
-    "HikAcName": "门禁2",
-    "HikAcIP": "192.168.1.202",
-    "HikAcUser": "admin",
-    "HikAcPassword": "password",
-    "HikAcPort": 8000,
-    "HikAcRetryCount": 3,
-    "HikAcWaitmillisecounds": 1000
-  }
-]
-```
-
-**响应示例**：
-```json
-{
-  "code": 200,
-  "message": "批量门禁配置处理完成",
-  "data": {
-    "total": 2,
-    "success": 2,
-    "failed": 0,
-    "errors": []
-  }
-}
-```
 
 ### 3. 报警/计数接口
 
@@ -523,16 +473,9 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
 | retry_count | INTEGER | 重试次数 |
 | wait_milliseconds | INTEGER | 等待毫秒数 |
 
-### 门禁配置表（hik_ac_infomation）
+### 门禁配置（不落库）
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | UUID | 主键 |
-| hik_ac_name | VARCHAR | 门禁名称 |
-| hik_ac_ip | VARCHAR | IP 地址 |
-| hik_ac_port | INTEGER | 端口号 |
-| hik_ac_user | VARCHAR | 用户名 |
-| hik_ac_password | VARCHAR | 密码 |
+门禁信息不保存，前端每次开门时直接传入门禁 IP、端口、用户名、密码、名称。
 
 ### 报警绑定配置表（hik_alarm_bind）
 
@@ -662,12 +605,7 @@ VALUES (gen_random_uuid(), '新摄像头', '192.168.1.100', 80, 'admin', 'passwo
 
 ### 2. 如何添加新的门禁配置？
 
-在 PostgreSQL 数据库的 `hik_ac_infomation` 表中插入新记录：
-
-```sql
-INSERT INTO hik_ac_infomation (id, hik_ac_name, hik_ac_ip, hik_ac_port, hik_ac_user, hik_ac_password)
-VALUES (gen_random_uuid(), '新门禁', '192.168.1.200', 8000, 'admin', 'password');
-```
+无需入库，前端调用开门接口时直接传入门禁信息即可（见接口文档示例）。
 
 ### 3. 如何配置报警绑定？
 
