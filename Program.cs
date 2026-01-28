@@ -4,6 +4,8 @@ using Serilog;
 using WebCameraApi.Services;
 using System.Text;
 using System.Linq;
+using System.Reflection;
+using Microsoft.OpenApi.Models;
 // 定义WebCameraApi项目的根命名空间
 namespace WebCameraApi
 {
@@ -58,7 +60,6 @@ namespace WebCameraApi
                         .Select(url => url.Trim())
                         .Where(url => !string.IsNullOrWhiteSpace(url))
                         .ToList();
-
                     // 未配置证书时移除 https 监听，避免 Windows 下权限/证书绑定错误
                     if (!HasHttpsCertificate(builder.Configuration))
                     {
@@ -115,7 +116,19 @@ namespace WebCameraApi
             builder.Services.AddEndpointsApiExplorer();
 
             // 添加Swagger生成器服务，用于生成API文档和调试界面
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "WebCamera API",
+                    Version = "v1",
+                    Description = "摄像头、门禁与海康报警相关接口文档（中文说明）"
+                });
+
+                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+            });
 
             // 注册摄像头RTSP服务为Scoped生命周期
             builder.Services.AddScoped<CameraRtspService>();

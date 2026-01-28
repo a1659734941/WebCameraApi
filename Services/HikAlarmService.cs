@@ -93,6 +93,7 @@ namespace WebCameraApi.Services
 
                     var alarmBincRepository = new PgHikAlarmBindConfigRepository();
                     await alarmBincRepository.CreateTableIfNotExistsAsync(_connectionString);
+                    await _PgHikAlarmRecord.CreateTableIfNotExistsAsync(_connectionString);
                     var alarmBindList = await alarmBincRepository.GetAllHikAlarmBindsAsync(_connectionString);
 
                     // 清空并批量写入并发字典
@@ -511,6 +512,37 @@ namespace WebCameraApi.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 获取最近6个月的报警数量统计
+        /// </summary>
+        public MonthlyAlarmStatDto GetRecentSixMonthAlarmStats()
+        {
+            var currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            var startMonth = currentMonth.AddMonths(-5);
+            var endMonthExclusive = currentMonth.AddMonths(1);
+
+            var monthCounts = _PgHikAlarmRecord
+                .GetMonthlyAlarmCountsAsync(_connectionString, startMonth, endMonthExclusive)
+                .Result;
+
+            var dateList = new List<string>();
+            var alarmTotalList = new List<int>();
+
+            for (int i = 0; i < 6; i++)
+            {
+                var month = startMonth.AddMonths(i);
+                dateList.Add($"{month.Year}年{month.Month}月");
+                monthCounts.TryGetValue(month, out var count);
+                alarmTotalList.Add(count);
+            }
+
+            return new MonthlyAlarmStatDto
+            {
+                DateList = dateList,
+                AlarmTotalList = alarmTotalList
+            };
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using WebCameraApi.Dto;
 using WebCameraApi.Services;
@@ -33,6 +33,7 @@ namespace WebCameraApi.Controllers
         /// <summary>
         /// 接收摄像头人数计数数据（供摄像头每秒调用）
         /// </summary>
+        /// <remarks>请求体为表单字段 personQueueCounting（JSON字符串）。</remarks>
         [HttpPost]
         [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status200OK)]
         public async Task<IActionResult> CountingCamera()
@@ -52,6 +53,7 @@ namespace WebCameraApi.Controllers
         /// <summary>
         /// 接收摄像头行为分析JSON数据（POST API）
         /// </summary>
+        /// <remarks>请求体为JSON，包含 eventType、dateTime、targetAttrs 等字段。</remarks>
         [HttpPost]
         [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status200OK)]
         public async Task<IActionResult> BehaviorAnalysisJson()
@@ -108,6 +110,27 @@ namespace WebCameraApi.Controllers
                 return Ok(ApiResponseDto<HikAlarmRecordPageDto>.Fail("查询异常（内部日志已记录）", 500));
             }
         }
+
+        /// <summary>
+        /// 获取最近6个月报警数量统计（按月汇总）
+        /// </summary>
+        /// <returns>月份列表与对应报警数量</returns>
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponseDto<MonthlyAlarmStatDto>), StatusCodes.Status200OK)]
+        public IActionResult GetRecentSixMonthAlarmStats()
+        {
+            try
+            {
+                var result = _hikAlarmService.GetRecentSixMonthAlarmStats();
+                return Ok(ApiResponseDto<MonthlyAlarmStatDto>.Success(result, "请求成功"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "HikAlarmController.GetRecentSixMonthAlarmStats 接口查询异常");
+                return Ok(ApiResponseDto<MonthlyAlarmStatDto>.Fail("查询异常（内部日志已记录）", 500));
+            }
+        }
+
         /// <summary>
         /// 获取所有报警记录，查看不同事件的出现次数
         /// </summary>

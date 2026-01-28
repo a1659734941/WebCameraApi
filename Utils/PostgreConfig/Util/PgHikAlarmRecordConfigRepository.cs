@@ -420,6 +420,58 @@ namespace PostgreConfig
             return result;
         }
 
+        /// <summary>
+        /// 获取指定时间范围内每月报警数量（按月汇总）
+        /// </summary>
+        /// <param name="_connectionString">数据库连接字符串</param>
+        /// <param name="startTime">开始时间（包含）</param>
+        /// <param name="endTimeExclusive">结束时间（不包含）</param>
+        public async Task<Dictionary<DateTime, int>> GetMonthlyAlarmCountsAsync(
+            string _connectionString,
+            DateTime startTime,
+            DateTime endTimeExclusive)
+        {
+            var result = new Dictionary<DateTime, int>();
+            using (var conn = new NpgsqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                var eventTimeCol = await ResolveColumnNameAsync(conn, "hik_alarm_record", "eventtime", "EventTime");
+                if (string.IsNullOrWhiteSpace(eventTimeCol))
+                {
+                    throw new Exception("hik_alarm_record 表中未找到 EventTime/eventtime 字段，请检查表结构");
+                }
+
+                var eventTimeExpr = QuoteIdentifierIfNeeded(eventTimeCol);
+                var sql = $@"
+                    SELECT date_trunc('month', {eventTimeExpr}) AS ""Month"",
+                           COUNT(*) AS ""Count""
+                    FROM hik_alarm_record
+                    WHERE {eventTimeExpr} >= @StartTime AND {eventTimeExpr} < @EndTime
+                    GROUP BY ""Month""
+                    ORDER BY ""Month"";";
+
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@StartTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = startTime });
+                    cmd.Parameters.Add(new NpgsqlParameter("@EndTime", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = endTimeExclusive });
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var monthStart = reader.GetDateTime(reader.GetOrdinal("Month"));
+                            var normalized = new DateTime(monthStart.Year, monthStart.Month, 1);
+                            var count = reader.GetInt32(reader.GetOrdinal("Count"));
+                            result[normalized] = count;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
         private static async Task<string?> ResolveColumnNameAsync(
             NpgsqlConnection conn,
             string tableName,

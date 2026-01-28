@@ -87,4 +87,20 @@ namespace HikAlarmEndPoints
         /// </summary>
         public int Total { get; set; }
     }
+
+    /// <summary>
+    /// 最近月份报警统计返回对象
+    /// </summary>
+    public class MonthlyAlarmStatDto
+    {
+        /// <summary>
+        /// 月份列表（格式：yyyy年M月）
+        /// </summary>
+        public List<string> DateList { get; set; } = new List<string>();
+
+        /// <summary>
+        /// 每月报警数量（与DateList一一对应）
+        /// </summary>
+        public List<int> AlarmTotalList { get; set; } = new List<int>();
+    }
 }

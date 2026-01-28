@@ -8,6 +8,9 @@ using System;
 
 namespace WebCameraApi.Controllers
 {
+    /// <summary>
+    /// 摄像头RTSP配置与查询接口
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -23,7 +26,14 @@ namespace WebCameraApi.Controllers
             _ = _cameraRtspService.InitPostgreAsync();
         }
 
+        /// <summary>
+        /// 查询单个摄像头RTSP地址（GET）
+        /// </summary>
+        /// <param name="cameraName">摄像头名称（必填）</param>
+        /// <returns>RTSP地址与摄像头基础信息</returns>
         [HttpGet("GetRtsp")]
+        [ProducesResponseType(typeof(ApiResponseDto<CameraRtspResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetRtsp([FromQuery] string cameraName)
         {
             // 参数校验
@@ -45,7 +55,14 @@ namespace WebCameraApi.Controllers
             }
         }
 
+        /// <summary>
+        /// 查询单个摄像头RTSP地址（POST）
+        /// </summary>
+        /// <param name="cameraName">摄像头名称（必填，JSON字符串）</param>
+        /// <returns>RTSP地址与摄像头基础信息</returns>
         [HttpPost("GetRtsp")]
+        [ProducesResponseType(typeof(ApiResponseDto<CameraRtspResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostRtsp([FromBody] string cameraName)
         {
             // 参数校验
@@ -67,7 +84,15 @@ namespace WebCameraApi.Controllers
             }
         }
 
+        /// <summary>
+        /// 批量新增/更新摄像头配置
+        /// </summary>
+        /// <param name="configs">摄像头配置列表（必填）</param>
+        /// <returns>批量处理结果，包含成功/失败数量与错误明细</returns>
         [HttpPost("BatchAddConfig")]
+        [ProducesResponseType(typeof(ApiResponseDto<BatchImportResultDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponseDto<BatchImportResultDto>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> BatchAddConfig([FromBody] List<CameraConfigDto> configs)
         {
             if (configs == null || configs.Count == 0)
