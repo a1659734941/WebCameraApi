@@ -14,10 +14,15 @@ WebCameraApi 是一个基于 .NET 8.0 的 Web API 项目，用于集成和管理
 - 自动拼接完整的 RTSP 地址（包含认证信息）
 
 ### 2. 海康门禁控制
-- 通过门禁名称或 IP 地址控制门禁开门
-- 前端调用开门接口时直接传入门禁信息
-- 使用海康威视 SDK 控制门禁
-- 支持多种门禁设备管理
+- **开门**：通过门禁名称或 IP 控制门禁开门，前端直接传入门禁信息（IP、端口、账号、密码）
+- **人脸录制**：从门禁设备采集人脸并保存到 `wwwroot/RecordFaceImage`，返回 Base64 与相对路径
+- **人员管理**：
+  - **下发人员**（addUser）：向一台或多台门禁下发人员信息（工号、姓名、有效期等）
+  - **查询人员**（queryUsers）：按工号/姓名查询门禁上的人员列表，支持分页
+  - **下发人脸**（addFace）：向门禁下发人脸并绑定到已有人员（Base64 或服务器路径）
+  - **删除用户**（deleteUser）：按工号删除门禁用户（同时删除关联的卡、指纹、人脸）；删除命令通过 HTTP ISAPI（80 端口）下发，删除进度通过 SDK 长连接（8000 端口）轮询
+- 使用海康威视 SDK（登录、开门、查询/下发/删除人员及进度）与 HTTP ISAPI（删除命令 PUT）配合
+- 支持多台门禁设备批量操作（开门、下发人员、查询、下发人脸、删除用户）
 
 ### 3. 海康报警/计数服务
 - **人数计数接口**：接收摄像头人数计数数据，当人数少于阈值时自动发送锁定/解锁请求
@@ -338,6 +343,148 @@ Content-Type: application/json
 }
 ```
 
+#### 门禁人脸录制
+
+**接口地址**：`/api/HikAC/recordFace`
+
+**请求方式**：POST，JSON
+
+**请求示例**：
+```json
+{
+  "HikAcIP": "192.168.1.108",
+  "HikAcPort": 8000,
+  "HikAcUserName": "admin",
+  "HikAcPassword": "password",
+  "AcName": "门禁1"
+}
+```
+
+**说明**：从门禁设备采集人脸，保存到 `wwwroot/RecordFaceImage`，返回 Base64 与相对路径。
+
+#### 下发人员信息（新增）
+
+**接口地址**：`/api/HikAC/addUser`
+
+**请求方式**：POST，JSON
+
+**请求示例**：
+```json
+{
+  "devices": [
+    {
+      "hikAcIP": "192.168.1.108",
+      "hikAcPort": 8000,
+      "hikAcUserName": "admin",
+      "hikAcPassword": "password",
+      "acName": "A门禁"
+    }
+  ],
+  "userID": "1001",
+  "userName": "张三",
+  "startTime": "2026-01-01 00:00:00",
+  "endTime": "2026-12-31 23:59:59"
+}
+```
+
+**说明**：向一台或多台门禁下发人员信息（工号、姓名、有效期等），支持批量设备。
+
+#### 查询人员信息
+
+**接口地址**：`/api/HikAC/queryUsers`
+
+**请求方式**：POST，JSON
+
+**请求示例**：
+```json
+{
+  "devices": [
+    {
+      "hikAcIP": "192.168.1.108",
+      "hikAcPort": 8000,
+      "hikAcUserName": "admin",
+      "hikAcPassword": "password",
+      "acName": "A门禁"
+    }
+  ],
+  "userID": "1001",
+  "userName": "张三"
+}
+```
+
+**说明**：按工号/姓名（可选）查询门禁上的人员列表，支持分页。
+
+#### 下发人脸到门禁
+
+**接口地址**：`/api/HikAC/addFace`
+
+**请求方式**：POST，JSON
+
+**请求示例**：
+```json
+{
+  "devices": [
+    {
+      "hikAcIP": "192.168.1.108",
+      "hikAcPort": 8000,
+      "hikAcUserName": "admin",
+      "hikAcPassword": "password",
+      "acName": "A门禁"
+    }
+  ],
+  "employeeNo": "1001",
+  "name": "张三",
+  "faceImageBase64": "base64编码的人脸图片...",
+  "FDID": "1"
+}
+```
+
+**说明**：向门禁下发人脸并绑定到已有人员；`faceImageBase64` 与 `faceImagePath` 二选一；`FDID` 为人脸库 ID，默认为 1。
+
+#### 删除门禁用户信息
+
+**接口地址**：`/api/HikAC/deleteUser`
+
+**请求方式**：POST，JSON
+
+**请求示例**：
+```json
+{
+  "devices": [
+    {
+      "hikAcIP": "192.168.1.108",
+      "hikAcPort": 8000,
+      "hikAcUserName": "admin",
+      "hikAcPassword": "password",
+      "acName": "A门禁"
+    }
+  ],
+  "userID": "0217"
+}
+```
+
+**说明**：按工号（userID）删除门禁用户；删除会同时删除其关联的卡、指纹、人脸信息。删除命令通过 HTTP ISAPI（端口 80）下发，删除进度通过 SDK 长连接（端口 8000）轮询，进度为 success 时表示删除完成。
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "删除用户成功",
+  "data": {
+    "userID": "0217",
+    "results": [
+      {
+        "hikAcIP": "192.168.1.108",
+        "hikAcPort": 8000,
+        "acName": "A门禁",
+        "isSuccess": true,
+        "message": "删除用户成功",
+        "deviceResponse": ""
+      }
+    ]
+  }
+}
+```
 
 ### 3. 报警/计数接口
 
@@ -530,7 +677,7 @@ WebCameraApi/
 │   ├── ApiResponseDto.cs          # 通用API响应格式
 │   ├── CameraRtspRequest.cs       # 摄像头RTSP请求
 │   ├── CameraRtspResponse.cs      # 摄像头RTSP响应
-│   └── HikAcDto.cs                # 海康门禁DTO
+│   └── HikAcDto.cs                # 海康门禁 DTO（开门、人脸录制、人员下发/查询/删除、人脸下发等请求与响应）
 ├── Utils/               # 工具类
 │   ├── ConfigGet/       # 配置获取工具
 │   │   └── Appsettings_Get.cs
@@ -587,6 +734,7 @@ WebCameraApi/
 14. **图片可访问性**：行为分析接口会下载 `resourcesContent` 的图片 URL，要求 API 服务器能直接访问该 URL（若需要鉴权需改造代码）
 15. **绑定配置加载**：`hik_alarm_bind` 绑定信息在服务启动时加载，数据库修改后需重启服务生效
 16. **人数阈值固定**：人数计数阈值当前固定为 `< 3` 触发锁定，如需可配置化需调整代码
+17. **门禁端口说明**：门禁设备 8000 端口为海康 SDK 私有协议（登录、开门、查询/下发人员、查删除进度等）；HTTP ISAPI（如删除用户命令 PUT）走 80 端口。删除用户接口会先通过 HTTP 80 下发删除命令，再通过 SDK 8000 轮询删除进度
 
 ## 许可证
 
@@ -656,6 +804,14 @@ VALUES ('192.168.1.100', '192.168.1.50', '审讯室1');
 - 查看 `logs` 目录下的日志文件，获取详细错误信息
 - 确认门禁设备在线且未被锁定
 
+### 10.1 如何删除门禁用户？删除失败怎么办？
+
+- 调用 `POST /api/HikAC/deleteUser`，请求体包含 `devices`（门禁设备列表）和 `userID`（要删除的人员工号）
+- 删除会同时删除该用户的卡、指纹、人脸信息
+- 删除命令通过 HTTP ISAPI（端口 80）下发，删除进度通过 SDK（端口 8000）轮询；需确保设备 80 端口可访问（ISAPI），8000 端口可访问（SDK 登录与进度查询）
+- 若提示“下发删除命令失败”：检查设备 80 端口是否开放、账号密码是否正确、设备是否支持 ISAPI 删除
+- 若提示“查询删除进度超时”或“建立长连接失败”：检查 8000 端口与 SDK 登录是否正常，查看日志中的 `UserInfoDetailDeleteProcess` 返回内容
+
 ### 11. 如何启用 HTTPS？
 
 1. 获取 SSL 证书（.pfx 或 .pem 格式）
@@ -694,3 +850,4 @@ VALUES ('192.168.1.100', '192.168.1.50', '审讯室1');
 
 - **v1.0.0**：初始版本，支持摄像头 RTSP 获取、门禁控制、报警处理功能
 - **v1.1.0**：新增报警记录统计接口，优化防抖机制，增强并发处理能力
+- **v1.2.0**：门禁能力扩展：人脸录制（recordFace）、下发人员（addUser）、查询人员（queryUsers）、下发人脸（addFace）、删除门禁用户（deleteUser）；删除用户采用 HTTP ISAPI 下发命令 + SDK 轮询进度，兼容设备 80/8000 端口
