@@ -94,8 +94,8 @@ namespace WebCameraApi
             // 注册命名的HttpClient实例，名称为"hik"，用于调用海康威视相关接口
             builder.Services.AddHttpClient("hik", client =>
             {
-                // 设置HttpClient的请求超时时间为3秒，与业务层超时保持一致
-                client.Timeout = TimeSpan.FromMilliseconds(3000);
+                // ISAPI采集可能需要更长时间，适当放宽超时
+                client.Timeout = TimeSpan.FromSeconds(10);
             })
             // 配置HttpClient的底层消息处理器
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler

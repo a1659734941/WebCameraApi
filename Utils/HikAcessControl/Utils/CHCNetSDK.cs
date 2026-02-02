@@ -1221,6 +1221,7 @@ namespace HikHCNetSDK
         [DllImport(@".\res\lib\HCNetSDK.dll")]
         public static extern bool NET_DVR_SetDVRMessageCallBack_V50(int iIndex, MSGCallBack fMessageCallBack, IntPtr pUser);
  
+        // 不加 Pack=1，与 C 默认对齐一致，否则 SDK 读取 lpJsonData/lpPicData 偏移错误导致 Invalid Content
         [StructLayoutAttribute(LayoutKind.Sequential)]
         public struct NET_DVR_JSON_DATA_CFG
         {
@@ -1243,7 +1244,8 @@ namespace HikHCNetSDK
             public byte[] byRes;
             public void init()
             {
-                byRes = new byte[128];
+                dwSize = Marshal.SizeOf<NET_DVR_CAPTURE_FACE_COND>(); // 关键：设置正确的结构体大小
+                byRes = new byte[128]; // 初始化预留字节，避免空引用
             }
         }
  
@@ -1267,12 +1269,16 @@ namespace HikHCNetSDK
             public byte[] byRes;
             public void init()
             {
+                dwSize = Marshal.SizeOf<NET_DVR_CAPTURE_FACE_CFG>();
                 byRes = new byte[116];
             }
         }
  
         [DllImport(@".\res\lib\HCNetSDK.dll")]
         public static extern int NET_DVR_GetNextRemoteConfig(int lHandle, ref CHCNetSDK.NET_DVR_CAPTURE_FACE_CFG lpOutBuff, int dwOutBuffSize);
+
+        [DllImport(@".\res\lib\HCNetSDK.dll")]
+        public static extern int NET_DVR_GetNextRemoteConfig(int lHandle, IntPtr lpOutBuff, int dwOutBuffSize);
  
         public const int ERROR_MSG_LEN = 32;
         public const int MAX_FINGER_PRINT_LEN = 768;
@@ -13100,31 +13106,34 @@ namespace HikHCNetSDK
             public byte[] byRes2; //保留
           }
  
-        //XML透传接口
-        [StructLayoutAttribute(LayoutKind.Sequential)]
+        //XML透传接口（与官方文档一致，避免错误码17）
+        [StructLayoutAttribute(LayoutKind.Sequential, Pack = 1)]
         public struct NET_DVR_XML_CONFIG_INPUT
         {
             public uint dwSize;//结构体大小
             public IntPtr lpRequestUrl;//请求信令，字符串格式
-            public uint dwRequestUrlLen;
+            public uint dwRequestUrlLen;//请求信令长度，字符串长度
             public IntPtr lpInBuffer;//输入参数缓冲区，XML格式
-            public uint dwInBufferSize;
+            public uint dwInBufferSize;//输入参数缓冲区大小
             public uint dwRecvTimeOut;//接收超时时间，单位：ms，填0则使用默认超时5s
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 32, ArraySubType = UnmanagedType.I1)]
-            public byte[] byRes;
+            public byte byForceEncrpt;//是否强制加密：0-否，1-是
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 31, ArraySubType = UnmanagedType.I1)]
+            public byte[] byRes;//保留，置为0
         }
- 
-        [StructLayoutAttribute(LayoutKind.Sequential)]
+
+        [StructLayoutAttribute(LayoutKind.Sequential, Pack = 1)]
         public struct NET_DVR_XML_CONFIG_OUTPUT
         {
-            public uint dwSize;//结构体大小
-            public IntPtr lpOutBuffer;//输出参数缓冲区，XML格式
-            public uint dwOutBufferSize;
-            public uint dwReturnedXMLSize;//实际输出的XML内容大小
-            public IntPtr lpStatusBuffer;//返回的状态参数(XML格式：ResponseStatus)，获取命令成功时不会赋值，如果不需要，可以置NULL
-            public uint dwStatusSize;//状态缓冲区大小(内存大小)
-            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 32, ArraySubType = UnmanagedType.I1)]
-            public byte[] byRes;
+            public uint dwSize;//[in]结构体大小
+            public IntPtr lpOutBuffer;//[out]输出参数缓冲区，XML格式
+            public uint dwOutBufferSize;//[in]输出参数缓冲区大小(内存大小)
+            public uint dwReturnedXMLSize;//[out]实际输出的XML内容大小
+            public IntPtr lpStatusBuffer;//[out]返回的状态参数(XML格式：ResponseStatus)，不需要可置NULL
+            public uint dwStatusSize;//[in]状态缓冲区大小(内存大小)
+            public IntPtr lpDataBuffer;//[out]当byNumOfMultiPart>0时，配合报文结构体使用，存放透传数据
+            public byte byNumOfMultiPart;//[out]0-无效，其他值表示报文分段个数
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 23, ArraySubType = UnmanagedType.I1)]
+            public byte[] byRes;//[out]保留，置为0
         }
  
         [StructLayoutAttribute(LayoutKind.Sequential)]
@@ -20015,23 +20024,23 @@ namespace HikHCNetSDK
  
         public delegate void RemoteConfigCallback(uint dwType, IntPtr lpBuffer, uint dwBufLen, IntPtr pUserData);
  
-        [DllImportAttribute(@"HCNetSDK.dll")]
+        [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
         public static extern int NET_DVR_StartRemoteConfig(int lUserID, int dwCommand, IntPtr lpInBuffer, Int32 dwInBufferLen, RemoteConfigCallback cbStateCallback, IntPtr pUserData);
          
-        [DllImportAttribute(@"HCNetSDK.dll")]
-        public static extern int NET_DVR_GetNextRemoteConfig(int lHandle, IntPtr lpOutBuff, int dwOutBuffSize);
+        // [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
+        // public static extern int NET_DVR_GetNextRemoteConfig(int lHandle, IntPtr lpOutBuff, int dwOutBuffSize);
  
-        [DllImportAttribute(@"HCNetSDK.dll")]
+        [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
         public static extern bool NET_DVR_SendRemoteConfig(int lHandle, int dwDataType, IntPtr pSendBuf, int dwBufSize);
  
-        [DllImportAttribute(@"HCNetSDK.dll")]
+        [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
         public static extern bool NET_DVR_StopRemoteConfig(int lHandle);
  
  
-        [DllImportAttribute(@"HCNetSDK.dll")]
+        [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
         public static extern bool NET_DVR_RemoteControl(int lUserID, int dwCommand, IntPtr lpInBuffer, int dwInBufferSize);
  
-        [DllImportAttribute(@"HCNetSDK.dll")]
+        [DllImportAttribute(@".\res\lib\HCNetSDK.dll")]
         public static extern bool NET_DVR_RemoteControl(int lUserID, int dwCommand, ref CHCNetSDK.NET_DVR_FACE_PARAM_CTRL_CARDNO lpInBuffer, int dwInBufferSize);
  
         [DllImport(@".\res\lib\HCNetSDK.dll")]
@@ -20085,7 +20094,7 @@ namespace HikHCNetSDK
         #endregion
  
         #region 消息事件
-        [DllImport("User32.dll", EntryPoint = "PostMessage")]
+        [DllImport(@".\res\lib\User32.dll", EntryPoint = "PostMessage")]
         public static extern int PostMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
         #endregion
  
