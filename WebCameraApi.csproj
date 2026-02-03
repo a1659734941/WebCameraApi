@@ -9,6 +9,8 @@
     <UserSecretsId>48f452a4-556a-474f-a589-18e6343ce25a</UserSecretsId>
     <DockerfileContext>.</DockerfileContext>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- 打包生成的 exe 使用此图标（仅 Windows 目标有效） -->
+    <ApplicationIcon>res\webcameraapilogo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,11 +23,16 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.2" />
     <PackageReference Include="XiaoFeng.Onvif" Version="1.0.2023.208" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ContainerPort Include="8081" />
 	<Content Include="res\lib\**\*">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+	</Content>
+	<Content Include="scripts\**\*">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 	</Content>

@@ -219,14 +219,25 @@ dotnet run --environment Production
 
 ## API 接口文档
 
-### 1. 摄像头 RTSP 接口
+### 通用说明
 
-#### 获取 RTSP 地址（GET）
+- **Base URL**：`http://{服务器IP}:{端口}`（开发默认 `http://localhost:5283`，生产见 `appsettings.Production.json` 的 `Urls`）
+- **通用响应格式**：所有接口返回 JSON，结构为 `{ "code": 200, "msg": "提示信息", "data": ... }`。成功时 `code` 为 200，失败时 `code` 为 400/500 等，`msg` 为错误说明，`data` 为业务数据（失败时可为 null）
+- **Content-Type**：请求体为 JSON 时使用 `Content-Type: application/json`
+- **Swagger**：启动后访问 `/swagger` 可查看并调试全部接口
 
-**接口地址**：`/api/CameraRtsp/GetRtsp`
+---
 
-**请求参数**：
-- `cameraName`（必填）：摄像头名称
+### 1. 摄像头 RTSP 接口（api/CameraRtsp）
+
+#### 1.1 获取 RTSP 地址（GET）
+
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `GET /api/CameraRtsp/GetRtsp` |
+| **请求参数** | `cameraName`（Query，必填）：摄像头名称 |
+| **成功 code** | 200 |
+| **失败 code** | 400（如摄像头名称为空、未找到配置） |
 
 **请求示例**：
 ```
@@ -237,7 +248,7 @@ GET /api/CameraRtsp/GetRtsp?cameraName=摄像头1
 ```json
 {
   "code": 200,
-  "message": "获取RTSP地址成功",
+  "msg": "获取RTSP地址成功",
   "data": {
     "cameraName": "摄像头1",
     "rtspUrl": "rtsp://username:password@192.168.1.100:554/Streaming/Channels/101"
@@ -245,32 +256,43 @@ GET /api/CameraRtsp/GetRtsp?cameraName=摄像头1
 }
 ```
 
-#### 获取 RTSP 地址（POST）
+#### 1.2 获取 RTSP 地址（POST）
 
-**接口地址**：`/api/CameraRtsp/GetRtsp`
-
-**请求参数**：
-- `cameraName`（必填）：摄像头名称
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/CameraRtsp/GetRtsp` |
+| **请求体** | JSON 字符串，内容为摄像头名称，例如 `"摄像头1"` |
+| **Content-Type** | `application/json` |
 
 **请求示例**：
-```json
+```
 POST /api/CameraRtsp/GetRtsp
 Content-Type: application/json
 
 "摄像头1"
 ```
 
-#### 批量添加/更新摄像头配置（POST）
+**响应格式**：与 GET 相同，`data` 含 `cameraName`、`rtspUrl`。
 
-**接口地址**：`/api/CameraRtsp/BatchAddConfig`
+#### 1.3 批量添加/更新摄像头配置（POST）
 
-**请求方法**：POST
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/CameraRtsp/BatchAddConfig` |
+| **请求体** | JSON 数组，每项为一条摄像头配置 |
+| **说明** | 以 `CameraName` 作为主键，已存在则更新；返回成功/失败条数及错误明细 |
 
-**请求方式**：JSON 数组
+**请求参数说明**（每项）：
 
-**说明**：
-- 以 `CameraName` 作为主键，若已存在则更新
-- 成功条数 = 校验通过的条数
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| CameraName | string | 是 | 摄像头名称 |
+| CameraIP | string | 是 | IP 地址 |
+| CameraUser | string | 是 | 用户名 |
+| CameraPassword | string | 是 | 密码 |
+| CameraPort | int | 是 | 端口，须 > 0 |
+| CameraRetryCount | int | 否 | 重试次数，默认 3 |
+| CameraWaitmillisecounds | int | 否 | 等待毫秒数，默认 1000 |
 
 **请求示例**：
 ```json
@@ -278,15 +300,6 @@ Content-Type: application/json
   {
     "CameraName": "审讯室1",
     "CameraIP": "192.168.1.101",
-    "CameraUser": "admin",
-    "CameraPassword": "password",
-    "CameraPort": 80,
-    "CameraRetryCount": 3,
-    "CameraWaitmillisecounds": 1000
-  },
-  {
-    "CameraName": "审讯室2",
-    "CameraIP": "192.168.1.102",
     "CameraUser": "admin",
     "CameraPassword": "password",
     "CameraPort": 80,
@@ -300,7 +313,7 @@ Content-Type: application/json
 ```json
 {
   "code": 200,
-  "message": "批量摄像头配置处理完成",
+  "msg": "批量摄像头配置处理完成",
   "data": {
     "total": 2,
     "success": 2,
@@ -310,19 +323,19 @@ Content-Type: application/json
 }
 ```
 
-### 2. 门禁控制接口
+### 2. 门禁控制接口（api/HikAC）
 
-#### 开启门禁
+门禁请求中设备项 `devices[].*` 通用字段：`hikAcIP`、`hikAcPort`（默认 8000）、`hikAcUserName`、`hikAcPassword`、`acName`（门禁名称，可选）。
 
-**接口地址**：`/api/HikAC/openHikAC`
+#### 2.1 开启门禁
 
-**请求方式**：JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/openHikAC` |
+| **请求体** | 单台门禁：`HikAcIP`、`HikAcPort`、`HikAcUserName`、`HikAcPassword`、`AcName` |
 
 **请求示例**：
 ```json
-POST /api/HikAC/openHikAC
-Content-Type: application/json
-
 {
   "HikAcIP": "192.168.1.200",
   "HikAcPort": 8000,
@@ -336,18 +349,20 @@ Content-Type: application/json
 ```json
 {
   "code": 200,
-  "message": "门禁 : 门禁1开门成功!",
+  "msg": "门禁 : 门禁1开门成功!",
   "data": {
     "acName": "门禁1"
   }
 }
 ```
 
-#### 门禁人脸录制
+#### 2.2 门禁人脸录制
 
-**接口地址**：`/api/HikAC/recordFace`
-
-**请求方式**：POST，JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/recordFace` |
+| **请求体** | 单台门禁连接参数（同上），无 `devices` 数组 |
+| **功能** | 从门禁设备采集人脸，保存到 `wwwroot/RecordFaceImage`，返回 Base64 与相对路径 |
 
 **请求示例**：
 ```json
@@ -360,13 +375,27 @@ Content-Type: application/json
 }
 ```
 
-**说明**：从门禁设备采集人脸，保存到 `wwwroot/RecordFaceImage`，返回 Base64 与相对路径。
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "门禁 : 门禁1人脸录制成功!",
+  "data": {
+    "acName": "门禁1",
+    "faceImageBase64": "base64编码的人脸图片...",
+    "faceImageFileName": "FaceData_xxx.jpg",
+    "faceImageRelativePath": "RecordFaceImage/FaceData_xxx.jpg"
+  }
+}
+```
 
-#### 下发人员信息（新增）
+#### 2.3 下发人员信息（新增）
 
-**接口地址**：`/api/HikAC/addUser`
-
-**请求方式**：POST，JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/addUser` |
+| **请求体** | `devices`（门禁列表）、`userID`（工号）、`userName`（姓名）、`startTime`/`endTime`（有效期，可选） |
+| **功能** | 向一台或多台门禁下发人员信息，支持批量设备 |
 
 **请求示例**：
 ```json
@@ -387,13 +416,35 @@ Content-Type: application/json
 }
 ```
 
-**说明**：向一台或多台门禁下发人员信息（工号、姓名、有效期等），支持批量设备。
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "下发人员成功",
+  "data": {
+    "userID": "1001",
+    "userName": "张三",
+    "results": [
+      {
+        "hikAcIP": "192.168.1.108",
+        "hikAcPort": 8000,
+        "acName": "A门禁",
+        "isSuccess": true,
+        "message": "下发人员成功",
+        "deviceResponse": ""
+      }
+    ]
+  }
+}
+```
 
-#### 查询人员信息
+#### 2.4 查询人员信息
 
-**接口地址**：`/api/HikAC/queryUsers`
-
-**请求方式**：POST，JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/queryUsers` |
+| **请求体** | `devices`（门禁列表）、`userID`（可选）、`userName`（可选） |
+| **功能** | 按工号/姓名（可选）查询门禁上的人员列表，支持分页 |
 
 **请求示例**：
 ```json
@@ -412,13 +463,43 @@ Content-Type: application/json
 }
 ```
 
-**说明**：按工号/姓名（可选）查询门禁上的人员列表，支持分页。
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "查询人员成功",
+  "data": {
+    "results": [
+      {
+        "hikAcIP": "192.168.1.108",
+        "hikAcPort": 8000,
+        "acName": "A门禁",
+        "totalMatches": 1,
+        "users": [
+          {
+            "userID": "1001",
+            "userName": "张三",
+            "userType": "normal",
+            "validEnabled": true,
+            "beginTime": "2026-01-01T00:00:00",
+            "endTime": "2026-12-31T23:59:59"
+          }
+        ],
+        "isSuccess": true,
+        "message": "查询成功"
+      }
+    ]
+  }
+}
+```
 
-#### 下发人脸到门禁
+#### 2.5 下发人脸到门禁
 
-**接口地址**：`/api/HikAC/addFace`
-
-**请求方式**：POST，JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/addFace` |
+| **请求体** | `devices`、`employeeNo`（工号，必填）、`name`、`faceImageBase64` 或 `faceImagePath`（二选一）、`FDID`（人脸库 ID，默认 1） |
+| **功能** | 向门禁下发人脸并绑定到已有人员 |
 
 **请求示例**：
 ```json
@@ -439,13 +520,35 @@ Content-Type: application/json
 }
 ```
 
-**说明**：向门禁下发人脸并绑定到已有人员；`faceImageBase64` 与 `faceImagePath` 二选一；`FDID` 为人脸库 ID，默认为 1。
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "下发人脸成功",
+  "data": {
+    "employeeNo": "1001",
+    "name": "张三",
+    "results": [
+      {
+        "hikAcIP": "192.168.1.108",
+        "hikAcPort": 8000,
+        "acName": "A门禁",
+        "isSuccess": true,
+        "message": "下发人脸成功",
+        "deviceResponse": ""
+      }
+    ]
+  }
+}
+```
 
-#### 删除门禁用户信息
+#### 2.6 删除门禁用户信息
 
-**接口地址**：`/api/HikAC/deleteUser`
-
-**请求方式**：POST，JSON
+| 项目 | 说明 |
+|------|------|
+| **接口地址** | `POST /api/HikAC/deleteUser` |
+| **请求体** | `devices`、`userID`（要删除的人员工号，必填） |
+| **功能** | 按工号删除门禁用户；同时删除其关联的卡、指纹、人脸。删除命令经 HTTP ISAPI（80 端口）下发，进度经 SDK（8000 端口）轮询 |
 
 **请求示例**：
 ```json
@@ -462,8 +565,6 @@ Content-Type: application/json
   "userID": "0217"
 }
 ```
-
-**说明**：按工号（userID）删除门禁用户；删除会同时删除其关联的卡、指纹、人脸信息。删除命令通过 HTTP ISAPI（端口 80）下发，删除进度通过 SDK 长连接（端口 8000）轮询，进度为 success 时表示删除完成。
 
 **响应示例**：
 ```json
@@ -575,6 +676,31 @@ GET /api/HikAlarm/SelectAlarmInfomation?startTime=2026-01-01 00:00:00&endTime=20
       "snapshotBase64Path": "HikAlarmSnapshotBase64/摄像头1_制服检测_20260121103000123.jpg",
       "rawData": "原始JSON数据"
     }
+  }
+}
+```
+
+#### 获取最近 6 个月报警统计
+
+**接口地址**：`/api/HikAlarm/GetRecentSixMonthAlarmStats`
+
+**请求方法**：GET
+
+**请求参数**：无
+
+**功能说明**：
+- 按自然月汇总最近 6 个月的报警数量
+- 返回月份列表（格式：`yyyy年M月`）与对应的报警数量列表（一一对应）
+- 用于趋势图、月度报表等展示
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "请求成功",
+  "data": {
+    "dateList": ["2025年9月", "2025年10月", "2025年11月", "2025年12月", "2026年1月", "2026年2月"],
+    "alarmTotalList": [12, 8, 15, 20, 6, 3]
   }
 }
 ```

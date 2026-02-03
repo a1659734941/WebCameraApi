@@ -24,6 +24,8 @@ namespace WebCameraApi
         {
             // 创建Web应用程序构建器，负责配置应用的所有服务和中间件
             var builder = WebApplication.CreateBuilder(args);
+            // 以 Windows 服务方式运行时，不弹控制台、正确响应服务停止
+            builder.Host.UseWindowsService();
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
             #region Serilog 日志配置
