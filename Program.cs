@@ -141,6 +141,11 @@ namespace WebCameraApi
             // 注册海康报警服务（HikAlarmService）为Scoped生命周期
             // Scoped：每个HTTP请求创建一个新的服务实例
             builder.Services.AddScoped<HikAlarmService>();
+
+            // 注册 UDP 客户端服务（智能柜/志信锁控板等）
+            builder.Services.AddScoped<UdpClientService>();
+            // 注册智能柜（志信锁控板）服务
+            builder.Services.AddScoped<SmartCabinetService>();
             #endregion
 
             // 构建Web应用程序实例，应用所有配置的服务和中间件
