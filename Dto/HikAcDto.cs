@@ -155,6 +155,14 @@ namespace WebCameraApi.Dto
         public bool ValidEnabled { get; set; }
         public string BeginTime { get; set; } = string.Empty;
         public string EndTime { get; set; } = string.Empty;
+        /// <summary>
+        /// 卡数量（设备返回的录卡信息数量）
+        /// </summary>
+        public int NumOfCard { get; set; }
+        /// <summary>
+        /// 人脸数量（设备返回的人脸信息数量）
+        /// </summary>
+        public int NumOfFace { get; set; }
     }
 
     public class HikAcUserSearchDeviceResultDto

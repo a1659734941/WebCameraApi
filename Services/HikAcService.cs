@@ -1284,6 +1284,16 @@ namespace WebCameraApi.Services
                 info.EndTime = validNode["endTime"]?.ToString() ?? string.Empty;
             }
 
+            // 人脸数量、录卡数量（设备返回 numOfCard、numOfFace）
+            if (item["numOfCard"] != null && int.TryParse(item["numOfCard"]?.ToString(), out int numOfCard))
+            {
+                info.NumOfCard = numOfCard;
+            }
+            if (item["numOfFace"] != null && int.TryParse(item["numOfFace"]?.ToString(), out int numOfFace))
+            {
+                info.NumOfFace = numOfFace;
+            }
+
             users.Add(info);
             batchCount++;
         }

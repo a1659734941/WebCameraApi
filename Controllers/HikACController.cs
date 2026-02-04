@@ -180,11 +180,11 @@ namespace WebCameraApi.Controllers
         }
 
         /// <summary>
-        /// 查询人员信息
+        /// 查询人员信息。若不携带 userID 和 userName，默认返回设备上所有人员信息。
         /// </summary>
-        /// <param name="request">门禁连接与查询条件</param>
+        /// <param name="request">门禁连接与查询条件（userID、userName 可选，不传则返回全部人员）</param>
         /// <remarks>
-        /// 请求示例：
+        /// 请求示例（按条件查询）：
         /// {
         ///   "devices": [
         ///     {
@@ -198,6 +198,7 @@ namespace WebCameraApi.Controllers
         ///   "userID": "1001",
         ///   "userName": "张三"
         /// }
+        /// 不传 userID、userName 时返回设备所有人员；每条人员信息包含 numOfCard（录卡数）、numOfFace（人脸数）。
         /// </remarks>
         [HttpPost("queryUsers")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcUserSearchResponseDto>), StatusCodes.Status200OK)]
