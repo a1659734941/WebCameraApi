@@ -29,7 +29,6 @@ namespace WebCameraApi.Controllers
         /// <returns>开门执行结果与设备名称</returns>
         [HttpPost("openHikAC")]
         [ProducesResponseType(typeof(ApiResponseDto<AcResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> OpenHikAC([FromBody] HikAcConfigDto config)
         {
             // 1. 参数校验
@@ -37,7 +36,7 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = "调用openHikAC接口失败：门禁配置不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try
@@ -71,14 +70,13 @@ namespace WebCameraApi.Controllers
         /// <returns>人脸图片Base64与保存信息</returns>
         [HttpPost("recordFace")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcRecordFaceResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RecordFace([FromBody] HikAcRecordFaceRequestDto config)
         {
             if (config == null)
             {
                 var errorMsg = "调用recordFace接口失败：门禁参数不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try
@@ -133,28 +131,27 @@ namespace WebCameraApi.Controllers
         /// </remarks>
         [HttpPost("addUser")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcUserAddResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AddUser([FromBody] HikAcUserAddRequestDto request)
         {
             if (request == null)
             {
                 var errorMsg = "调用addUser接口失败：请求参数不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (request.Devices == null || request.Devices.Count == 0)
             {
                 var errorMsg = "调用addUser接口失败：门禁设备列表不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (string.IsNullOrWhiteSpace(request.UserID) || string.IsNullOrWhiteSpace(request.UserName))
             {
                 var errorMsg = "调用addUser接口失败：UserID与UserName不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try
@@ -202,21 +199,20 @@ namespace WebCameraApi.Controllers
         /// </remarks>
         [HttpPost("queryUsers")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcUserSearchResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> QueryUsers([FromBody] HikAcUserSearchRequestDto request)
         {
             if (request == null)
             {
                 var errorMsg = "调用queryUsers接口失败：请求参数不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (request.Devices == null || request.Devices.Count == 0)
             {
                 var errorMsg = "调用queryUsers接口失败：门禁设备列表不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try
@@ -273,35 +269,34 @@ namespace WebCameraApi.Controllers
         /// </remarks>
         [HttpPost("addFace")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcFaceAddResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AddFace([FromBody] HikAcFaceAddRequestDto request)
         {
             if (request == null)
             {
                 var errorMsg = "调用addFace接口失败：请求参数不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (request.Devices == null || request.Devices.Count == 0)
             {
                 var errorMsg = "调用addFace接口失败：门禁设备列表不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (string.IsNullOrWhiteSpace(request.EmployeeNo))
             {
                 var errorMsg = "调用addFace接口失败：EmployeeNo（人员工号）不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (string.IsNullOrWhiteSpace(request.FaceImageBase64) && string.IsNullOrWhiteSpace(request.FaceImagePath))
             {
                 var errorMsg = "调用addFace接口失败：请提供人脸图片（FaceImageBase64或FaceImagePath）";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try
@@ -348,28 +343,27 @@ namespace WebCameraApi.Controllers
         /// </remarks>
         [HttpPost("deleteUser")]
         [ProducesResponseType(typeof(ApiResponseDto<HikAcUserDeleteResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> DeleteUser([FromBody] HikAcUserDeleteRequestDto request)
         {
             if (request == null)
             {
                 var errorMsg = "调用deleteUser接口失败：请求参数不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (request.Devices == null || request.Devices.Count == 0)
             {
                 var errorMsg = "调用deleteUser接口失败：门禁设备列表不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             if (string.IsNullOrWhiteSpace(request.UserID))
             {
                 var errorMsg = "调用deleteUser接口失败：要删除的人员工号(UserID)不能为空";
                 _logger.LogWarning(errorMsg);
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             try

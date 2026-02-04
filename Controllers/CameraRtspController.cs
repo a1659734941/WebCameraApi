@@ -33,14 +33,13 @@ namespace WebCameraApi.Controllers
         /// <returns>RTSP地址与摄像头基础信息</returns>
         [HttpGet("GetRtsp")]
         [ProducesResponseType(typeof(ApiResponseDto<CameraRtspResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetRtsp([FromQuery] string cameraName)
         {
             // 参数校验
             if (string.IsNullOrWhiteSpace(cameraName))
             {
                 var errorMsg = "摄像头名称不能为空！";
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             // 调用服务获取结果
@@ -51,7 +50,7 @@ namespace WebCameraApi.Controllers
             }
             else
             {
-                return BadRequest(ApiResponseDto<CameraRtspResponse>.Fail(status.Message, 400));
+                return Ok(ApiResponseDto<CameraRtspResponse>.Fail(status.Message, 400));
             }
         }
 
@@ -62,14 +61,13 @@ namespace WebCameraApi.Controllers
         /// <returns>RTSP地址与摄像头基础信息</returns>
         [HttpPost("GetRtsp")]
         [ProducesResponseType(typeof(ApiResponseDto<CameraRtspResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostRtsp([FromBody] string cameraName)
         {
             // 参数校验
             if (string.IsNullOrWhiteSpace(cameraName))
             {
                 var errorMsg = "摄像头名称不能为空！";
-                return BadRequest(ApiResponseDto.Fail(errorMsg, 400));
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
             }
 
             // 调用服务获取结果
@@ -80,7 +78,7 @@ namespace WebCameraApi.Controllers
             }
             else
             {
-                return BadRequest(ApiResponseDto<CameraRtspResponse>.Fail(status.Message, 400));
+                return Ok(ApiResponseDto<CameraRtspResponse>.Fail(status.Message, 400));
             }
         }
 
@@ -91,13 +89,11 @@ namespace WebCameraApi.Controllers
         /// <returns>批量处理结果，包含成功/失败数量与错误明细</returns>
         [HttpPost("BatchAddConfig")]
         [ProducesResponseType(typeof(ApiResponseDto<BatchImportResultDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(ApiResponseDto<BatchImportResultDto>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> BatchAddConfig([FromBody] List<CameraConfigDto> configs)
         {
             if (configs == null || configs.Count == 0)
             {
-                return BadRequest(ApiResponseDto.Fail("批量摄像头配置不能为空", 400));
+                return Ok(ApiResponseDto.Fail("批量摄像头配置不能为空", 400));
             }
 
             var result = new BatchImportResultDto { Total = configs.Count };
@@ -138,8 +134,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "批量摄像头配置写入数据库失败");
-                return StatusCode(StatusCodes.Status500InternalServerError,
-                    ApiResponseDto<BatchImportResultDto>.Fail("批量摄像头配置写入数据库失败", 500));
+                return Ok(ApiResponseDto<BatchImportResultDto>.Fail("批量摄像头配置写入数据库失败", 500));
             }
         }
 
