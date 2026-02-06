@@ -42,17 +42,25 @@ namespace WebCameraApi.Services
                 bool loginResult = hikAc.LoginAC(config.HikAcIP, config.HikAcPort, config.HikAcUserName, config.HikAcPassword);
                 if (loginResult)
                 {
-                    // 登录成功后开门
-                    bool openResult = hikAc.OpenGetway();
+                    // 登录成功后按配置执行门控/梯控：使用请求中的序号(GatewayIndex)与命令(Command)
+                    int gatewayIndex = config.GatewayIndex;
+                    int cmd = config.Command;
+                    if (cmd < 0 || cmd > 4)
+                    {
+                        status.message = $"门禁 : {config.AcName} 命令值无效(应为0-4)，当前为 {cmd}";
+                        return (response, status);
+                    }
+                    bool openResult = hikAc.ControlGateway(gatewayIndex, (uint)cmd);
                     if (openResult)
                     {
                         status.isSuccess = true;
-                        status.message = $"门禁 : {config.AcName}开门成功!";
+                        string cmdDesc = cmd switch { 0 => "关闭", 1 => "打开", 2 => "常开", 3 => "常关", 4 => "恢复", _ => cmd.ToString() };
+                        status.message = $"门禁 : {config.AcName} 序号={gatewayIndex} 命令={cmd}({cmdDesc}) 执行成功!";
                         return (response, status);
                     }
                     else
                     {
-                        status.message = $"门禁 : {config.AcName}开门失败!";
+                        status.message = $"门禁 : {config.AcName} 序号={gatewayIndex} 命令={cmd} 执行失败!";
                         return (response, status);
                     }
                 }
@@ -1284,16 +1292,6 @@ namespace WebCameraApi.Services
                 info.EndTime = validNode["endTime"]?.ToString() ?? string.Empty;
             }
 
-            // 人脸数量、录卡数量（设备返回 numOfCard、numOfFace）
-            if (item["numOfCard"] != null && int.TryParse(item["numOfCard"]?.ToString(), out int numOfCard))
-            {
-                info.NumOfCard = numOfCard;
-            }
-            if (item["numOfFace"] != null && int.TryParse(item["numOfFace"]?.ToString(), out int numOfFace))
-            {
-                info.NumOfFace = numOfFace;
-            }
-
             users.Add(info);
             batchCount++;
         }
@@ -1444,6 +1442,157 @@ namespace WebCameraApi.Services
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// 更新屏幕状态（切换显示图片）
+        /// </summary>
+        /// <param name="request">屏幕状态请求参数</param>
+        /// <returns>操作结果</returns>
+        public async Task<(HikAcScreenStatusResponseDto response, StatusDto status)> UpdateScreenStatus(HikAcScreenStatusRequestDto request)
+        {
+            var response = new HikAcScreenStatusResponseDto();
+            var status = new StatusDto { isSuccess = false };
+
+            if (request == null)
+            {
+                _logger.LogError("屏幕状态请求参数为空");
+                return (response, status);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.BGP))
+            {
+                _logger.LogError("图片名称(BGP)不能为空");
+                status.message = "图片名称(BGP)不能为空";
+                return (response, status);
+            }
+
+            try
+            {
+                // 使用请求中的IP
+                var ip = request.IP;
+                
+                // 创建HttpClient并设置认证信息
+                HttpClient client;
+                if (!string.IsNullOrWhiteSpace(request.UserName) && !string.IsNullOrWhiteSpace(request.Password))
+                {
+                    // 创建带有认证凭据的HttpClient
+                    var handler = new HttpClientHandler
+                    {
+                        AllowAutoRedirect = false,
+                        UseCookies = false,
+                        Credentials = new System.Net.NetworkCredential(request.UserName, request.Password),
+                        PreAuthenticate = true
+                    };
+                    client = new HttpClient(handler)
+                    {
+                        Timeout = TimeSpan.FromSeconds(10)
+                    };
+                }
+                else
+                {
+                    // 使用默认的HttpClient
+                    client = _httpClientFactory.CreateClient("hik");
+                }
+                
+                // 构造页面配置XML请求体
+                var pageContent = new StringContent($$"""
+                <?xml version="1.0" encoding="UTF-8"?><Page xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
+                    <id>1</id>
+                    <programName>1</programName>
+                    <programType>normal</programType>
+                    <PageBasicInfo>
+                        <pageName>1</pageName>
+                        <BackgroundColor>
+                            <RGB>16777215</RGB>
+                        </BackgroundColor>
+                        <backgroundPic>{request.BGP}</backgroundPic>
+                        <playDurationMode>1</playDurationMode>
+                        <switchDuration>1</switchDuration>
+                        <switchEffect>none</switchEffect>
+                    </PageBasicInfo>
+                    <WindowsList>
+                        <Windows>
+                            <id>1</id>
+                            <layerNo>1</layerNo>
+                            <WinMaterialInfo>
+                                <materialType>static</materialType>
+                                <staticMaterialType>picture</staticMaterialType>
+                            </WinMaterialInfo>
+                            <Position>
+                                <positionX>0</positionX>
+                                <positionY>0</positionY>
+                                <height>1920</height>
+                                <width>1920</width>
+                            </Position>
+                        </Windows>
+                    </WindowsList>
+                </Page>
+                """, Encoding.UTF8, "application/xml");
+
+                // 发送页面配置请求
+                var pageResponse = await client.PutAsync($"http://{ip}/ISAPI/Publish/ProgramMgr/program/1/page/1", pageContent);
+                pageResponse.EnsureSuccessStatusCode();
+                var pageData = await pageResponse.Content.ReadAsStringAsync();
+
+                // 构造播放计划XML请求体
+                var scheduleContent = new StringContent($$"""
+                <?xml version="1.0" encoding="utf-8"?><PlaySchedule xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
+                    <id>1</id>
+                    <scheduleName>web</scheduleName>
+                    <scheduleMode>screensaver</scheduleMode>
+                    <scheduleType>daily</scheduleType>
+                    <DailySchedule><PlaySpanList><PlaySpan>
+                    <id>1</id>
+                    <programNo>1</programNo>
+                    <TimeRange>
+                        <beginTime>00:00:00</beginTime>
+                        <endTime>24:00:00</endTime>
+                    </TimeRange>
+                </PlaySpan></PlaySpanList></DailySchedule></PlaySchedule>
+                """, Encoding.UTF8, "application/xml");
+
+                // 发送播放计划请求
+                var scheduleResponse = await client.PutAsync($"http://{ip}/ISAPI/Publish/ScheduleMgr/playSchedule/1", scheduleContent);
+                scheduleResponse.EnsureSuccessStatusCode();
+                var scheduleData = await scheduleResponse.Content.ReadAsStringAsync();
+
+                // 构造设备操作结果
+                var deviceResult = new HikAcScreenStatusDeviceResultDto
+                {
+                    IP = ip,
+                    AcName = request.AcName,
+                    IsSuccess = true,
+                    Message = "屏幕状态更新成功",
+                    DeviceResponse = pageData + scheduleData
+                };
+                response.Results.Add(deviceResult);
+
+                // 设置状态为成功
+                status.isSuccess = true;
+                status.message = "屏幕状态更新成功";
+
+                _logger.LogInformation("ScreenStatus接口调用成功：IP={IP}, BGP={BGP}", ip, request.BGP);
+                return (response, status);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ScreenStatus接口调用失败：IP={IP}, BGP={BGP}", request.IP, request.BGP);
+                status.message = $"操作失败：{ex.Message}";
+                
+                // 构造失败的设备操作结果
+                var deviceResult = new HikAcScreenStatusDeviceResultDto
+                {
+                    IP = request.IP,
+                    AcName = request.AcName,
+                    IsSuccess = false,
+                    Message = status.message,
+                    DeviceResponse = string.Empty
+                };
+                response.Results.Add(deviceResult);
+                
+                return (response, status);
+            }
         }
     }
 }

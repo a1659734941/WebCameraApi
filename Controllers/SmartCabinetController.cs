@@ -44,16 +44,13 @@ namespace WebCameraApi.Controllers
             var (code, msg, data) = await _smartCabinetService.ZhiXinAsync(request);
 
             if (code == 200)
-                _logger.LogInformation("志信锁控板接口成功: {IP}, {Action}", request.IP, request.Action);
-            else
-                _logger.LogWarning("志信锁控板接口失败: {IP}, {Action}, {Msg}", request.IP, request.Action, msg);
-
-            return Ok(new ApiResponseDto<SmartCabinetZhiXinResponseDto>
             {
-                Code = code,
-                Msg = msg,
-                Data = data
-            });
+                _logger.LogInformation("志信锁控板接口成功: {IP}, {Action}", request.IP, request.Action);
+                return Ok(ApiResponseDto<SmartCabinetZhiXinResponseDto>.Success(data, msg));
+            }
+
+            _logger.LogWarning("志信锁控板接口失败: {IP}, {Action}, {Msg}", request.IP, request.Action, msg);
+            return Ok(ApiResponseDto<SmartCabinetZhiXinResponseDto>.Fail(msg, code));
         }
     }
 }

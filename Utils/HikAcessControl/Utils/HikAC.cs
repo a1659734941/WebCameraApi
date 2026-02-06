@@ -112,26 +112,36 @@ namespace HikAcessControl
         }
 
         /// <summary>
-        /// 开门操作（修复原代码未返回值的漏洞）
+        /// 开门操作（默认门序号1、命令1-打开），兼容旧调用
         /// </summary>
-        /// <returns>开门是否成功</returns>
         public bool OpenGetway()
+        {
+            return ControlGateway(1, 1);
+        }
+
+        /// <summary>
+        /// 门控/梯控：远程门禁控制或梯控控制（NET_DVR_ControlGateway）
+        /// </summary>
+        /// <param name="lGatewayIndex">门禁序号(楼层编号、锁ID)，从1开始；-1 表示对所有门或梯控所有楼层操作</param>
+        /// <param name="dwStaic">命令值：0-关闭 1-打开 2-常开 3-常关 4-恢复</param>
+        /// <returns>是否成功</returns>
+        public bool ControlGateway(int lGatewayIndex, uint dwStaic)
         {
             if (lUserID < 0)
             {
                 _logger.LogWarning("请先登录设备！");
-                return false; // 原代码遗漏return，补充返回false
+                return false;
             }
-            bool isGateOpen = CHCNetSDK.NET_DVR_ControlGateway(lUserID, 1, 1);
-            if (isGateOpen)
+            bool ok = CHCNetSDK.NET_DVR_ControlGateway(lUserID, lGatewayIndex, dwStaic);
+            if (ok)
             {
-                _logger.LogInformation("开门操作执行成功");
+                _logger.LogInformation("门控/梯控操作执行成功，序号={Index}，命令={Cmd}", lGatewayIndex, dwStaic);
             }
             else
             {
-                _logger.LogError($"开门失败，错误码：{CHCNetSDK.NET_DVR_GetLastError()}");
+                _logger.LogError("门控/梯控失败，错误码：{Code}", CHCNetSDK.NET_DVR_GetLastError());
             }
-            return isGateOpen;
+            return ok;
         }
 
         public bool Logout()

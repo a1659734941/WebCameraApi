@@ -134,7 +134,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "批量摄像头配置写入数据库失败");
-                return Ok(ApiResponseDto<BatchImportResultDto>.Fail("批量摄像头配置写入数据库失败", 500));
+                return Ok(ApiResponseDto<BatchImportResultDto>.Fail("批量摄像头配置写入数据库失败", 400));
             }
         }
 

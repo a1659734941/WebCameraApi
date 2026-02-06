@@ -23,10 +23,10 @@ namespace WebCameraApi.Controllers
         }
 
         /// <summary>
-        /// 远程开门（海康门禁网关）
+        /// 远程门控/梯控（海康门禁网关）：支持 0-关闭 1-打开 2-常开 3-常关 4-恢复
         /// </summary>
-        /// <param name="config">门禁连接与开门参数（设备IP、账号、密码、通道等）</param>
-        /// <returns>开门执行结果与设备名称</returns>
+        /// <param name="config">门禁连接与门控参数（IP、账号、密码、Command 命令值 0-4）</param>
+        /// <returns>执行结果与设备名称</returns>
         [HttpPost("openHikAC")]
         [ProducesResponseType(typeof(ApiResponseDto<AcResponseDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> OpenHikAC([FromBody] HikAcConfigDto config)
@@ -59,8 +59,8 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = $"openHikAC接口调用异常：{config?.AcName}";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<AcResponseDto>.Success(new AcResponseDto { AcName = config?.AcName ?? string.Empty }, $"{errorMsg}，错误详情：{ex.Message}"));
-            }
+                return Ok(ApiResponseDto<AcResponseDto>.Fail(errorMsg, 400));
+            }   
         }
 
         /// <summary>
@@ -96,7 +96,7 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = $"recordFace接口调用异常：{config?.AcName}";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<HikAcRecordFaceResponseDto>.Success(new HikAcRecordFaceResponseDto { AcName = config?.AcName ?? string.Empty }, $"{errorMsg}，错误详情：{ex.Message}"));
+                return Ok(ApiResponseDto<HikAcRecordFaceResponseDto>.Fail(errorMsg, 400, new HikAcRecordFaceResponseDto { AcName = config?.AcName ?? string.Empty }));
             }
         }
 
@@ -172,7 +172,7 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = $"addUser接口调用异常：{request?.UserID}";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<HikAcUserAddResponseDto>.Success(new HikAcUserAddResponseDto(), $"{errorMsg}，错误详情：{ex.Message}"));
+                return Ok(ApiResponseDto<HikAcUserAddResponseDto>.Fail(errorMsg, 400, new HikAcUserAddResponseDto()));
             }
         }
 
@@ -234,7 +234,7 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = "queryUsers接口调用异常";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<HikAcUserSearchResponseDto>.Success(new HikAcUserSearchResponseDto(), $"{errorMsg}，错误详情：{ex.Message}"));
+                return Ok(ApiResponseDto<HikAcUserSearchResponseDto>.Fail(errorMsg, 400, new HikAcUserSearchResponseDto()));
             }
         }
 
@@ -317,7 +317,7 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = $"addFace接口调用异常：{request?.EmployeeNo}";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<HikAcFaceAddResponseDto>.Success(new HikAcFaceAddResponseDto(), $"{errorMsg}，错误详情：{ex.Message}"));
+                return Ok(ApiResponseDto<HikAcFaceAddResponseDto>.Fail(errorMsg, 400, new HikAcFaceAddResponseDto()));
             }
         }
 
@@ -383,7 +383,60 @@ namespace WebCameraApi.Controllers
             {
                 var errorMsg = $"deleteUser接口调用异常：{request.UserID}";
                 _logger.LogError(ex, errorMsg);
-                return Ok(ApiResponseDto<HikAcUserDeleteResponseDto>.Success(new HikAcUserDeleteResponseDto { UserID = request.UserID }, $"{errorMsg}，错误详情：{ex.Message}"));
+                return Ok(ApiResponseDto<HikAcUserDeleteResponseDto>.Fail(errorMsg, 400, new HikAcUserDeleteResponseDto { UserID = request.UserID }));
+            }
+        }
+
+        /// <summary>
+        /// 设置状态屏（切换显示图片）
+        /// </summary>
+        /// <param name="IP">门禁IP（可选，默认为配置文件中的IP）</param>
+        /// <param name="BGP">图片名称（必填，一般4为空闲，5为使用中，123是官方自带图片）</param>
+        /// <param name="UserName">用户名（可选，用于认证）</param>
+        /// <param name="Password">密码（可选，用于认证）</param>
+        /// <returns>操作结果</returns>
+        [HttpGet("ScreenStatus")]
+        [ProducesResponseType(typeof(ApiResponseDto<HikAcScreenStatusResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ScreenStatus([FromQuery] string? IP, [FromQuery] string BGP, [FromQuery] string? UserName, [FromQuery] string? Password)
+        {
+            // 1. 参数校验
+            if (string.IsNullOrWhiteSpace(BGP))
+            {
+                var errorMsg = "图片名称(BGP)不能为空";
+                _logger.LogWarning(errorMsg);
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
+            }
+
+            try
+            {
+                // 2. 构造请求参数
+                var request = new HikAcScreenStatusRequestDto
+                {
+                    IP = IP,
+                    BGP = BGP,
+                    UserName = UserName,
+                    Password = Password
+                };
+
+                // 3. 调用服务层方法
+                var (response, status) = await _hikAcService.UpdateScreenStatus(request);
+
+                // 4. 封装响应
+                if (status.isSuccess)
+                {
+                    _logger.LogInformation("ScreenStatus接口调用成功：IP={IP}, BGP={BGP}", IP, BGP);
+                }
+                else
+                {
+                    _logger.LogWarning("ScreenStatus接口调用失败：IP={IP}, BGP={BGP}, 原因：{Message}", IP, BGP, status.message);
+                }
+                return Ok(ApiResponseDto<HikAcScreenStatusResponseDto>.Success(response, status.message));
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"ScreenStatus接口调用异常：IP={IP}, BGP={BGP}";
+                _logger.LogError(ex, errorMsg);
+                return Ok(ApiResponseDto<HikAcScreenStatusResponseDto>.Fail(errorMsg, 400, new HikAcScreenStatusResponseDto()));
             }
         }
 

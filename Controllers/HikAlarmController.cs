@@ -46,7 +46,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.CountingCamera 接口处理异常");
-                return Ok(ApiResponseDto.Fail("处理异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto.Fail("处理异常（内部日志已记录）", 400));
             }
         }
 
@@ -70,8 +70,8 @@ namespace WebCameraApi.Controllers
             {
                 _logger.LogError(ex, "HikAlarmController.BehaviorAnalysisJson 接口处理异常");
 
-                // 返回200而非500，防止摄像头重复发送
-                return Ok(ApiResponseDto.Fail("行为分析数据处理异常（内部日志已记录）", 500));
+                // 返回200而非400，防止摄像头重复发送
+                return Ok(ApiResponseDto.Fail("行为分析数据处理异常（内部日志已记录）", 400));
             }
         }
 
@@ -107,7 +107,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.SelectAlarmInfomation 接口查询异常");
-                return Ok(ApiResponseDto<HikAlarmRecordPageDto>.Fail("查询异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto<HikAlarmRecordPageDto>.Fail("查询异常（内部日志已记录）", 400));
             }
         }
 
@@ -127,7 +127,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.GetRecentSixMonthAlarmStats 接口查询异常");
-                return Ok(ApiResponseDto<MonthlyAlarmStatDto>.Fail("查询异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto<MonthlyAlarmStatDto>.Fail("查询异常（内部日志已记录）", 400));
             }
         }
 
@@ -147,7 +147,7 @@ namespace WebCameraApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HikAlarmController.GetAllAlarmRecordCount 接口获取异常");
-                return Ok(ApiResponseDto<List<AlarmCountDto>>.Fail("获取异常（内部日志已记录）", 500));
+                return Ok(ApiResponseDto<List<AlarmCountDto>>.Fail("获取异常（内部日志已记录）", 400));
             }
         }
     }

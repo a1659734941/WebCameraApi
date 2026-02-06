@@ -1,4 +1,4 @@
-﻿namespace WebCameraApi.Dto
+namespace WebCameraApi.Dto
 {
     /// <summary>
     /// 通用接口返回格式
@@ -42,14 +42,15 @@
         /// </summary>
         /// <param name="msg">提示信息</param>
         /// <param name="code">状态码</param>
+        /// <param name="data">业务数据（可选，失败时可为默认值）</param>
         /// <returns></returns>
-        public static ApiResponseDto<T> Fail(string msg, int code = 400)
+        public static ApiResponseDto<T> Fail(string msg, int code = 400, T data = default!)
         {
             return new ApiResponseDto<T>
             {
                 Code = code,
                 Msg = msg,
-                Data = default!
+                Data = data
             };
         }
     }
