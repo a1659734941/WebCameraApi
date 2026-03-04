@@ -1,5 +1,5 @@
 using HikHCNetSDK;
-using Microsoft.Extensions.Logging; // 补充正确的ILogger命名空间（原代码可能遗漏）
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
@@ -12,12 +12,11 @@ using WebCameraApi.Services;
 
 namespace HikAcessControl
 {
-    public class HikAC
+    public partial class HikAC
     {
         private readonly ILogger<HikAcService> _logger;
         private CHCNetSDK.NET_DVR_USER_LOGIN_INFO pLoginInfo;
 
-        // 设备信息结构体
         private CHCNetSDK.NET_DVR_DEVICEINFO_V40 lpDeviceInfo = new CHCNetSDK.NET_DVR_DEVICEINFO_V40();
 
         private int lUserID = -1;
@@ -36,18 +35,16 @@ namespace HikAcessControl
 
         public string? LastFaceCaptureErrorMessage { get; private set; }
 
-        // 构造函数仅保留日志依赖，移除hikAcDto相关逻辑
         public HikAC(ILogger<HikAcService> logger)
         {
             _logger = logger;
-            // 仅初始化结构体缓冲区，不赋值业务参数（参数改为外部传入）
             pLoginInfo = new CHCNetSDK.NET_DVR_USER_LOGIN_INFO
             {
-                sDeviceAddress = new byte[129],  // 设备地址缓冲区（SDK定义129字节）
-                sUserName = new byte[64],       // 用户名缓冲区（64字节）
-                sPassword = new byte[64],       // 密码缓冲区（64字节）
-                byLoginMode = 0,                // 私有协议登录（默认）
-                byProxyType = 0                 // 不使用代理
+                sDeviceAddress = new byte[129],
+                sUserName = new byte[64],
+                sPassword = new byte[64],
+                byLoginMode = 0,
+                byProxyType = 0
             };
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             if (CHCNetSDK.NET_DVR_Init())
@@ -60,14 +57,6 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 登录海康门禁设备（参数改为外部传入）
-        /// </summary>
-        /// <param name="deviceIp">设备IP地址</param>
-        /// <param name="devicePort">设备端口号</param>
-        /// <param name="userName">登录用户名</param>
-        /// <param name="password">登录密码</param>
-        /// <returns>登录是否成功</returns>
         public bool LoginAC(string deviceIp, ushort devicePort, string userName, string password)
         {
             if (string.IsNullOrWhiteSpace(deviceIp))
@@ -81,25 +70,18 @@ namespace HikAcessControl
                 return false;
             }
 
-            // 填充端口（改为使用外部传入的参数）
             pLoginInfo.wPort = devicePort;
 
-            // 填充IP（GBK编码，海康SDK默认）
             byte[] ipBytes = Encoding.GetEncoding("GBK").GetBytes(deviceIp);
             Array.Copy(ipBytes, 0, pLoginInfo.sDeviceAddress, 0, Math.Min(ipBytes.Length, pLoginInfo.sDeviceAddress.Length));
 
-            // 填充用户名（改为外部传入）
             byte[] userNameBytes = Encoding.GetEncoding("GBK").GetBytes(userName);
             Array.Copy(userNameBytes, 0, pLoginInfo.sUserName, 0, Math.Min(userNameBytes.Length, pLoginInfo.sUserName.Length));
 
-            // 填充密码（改为外部传入）
             byte[] passwordBytes = Encoding.GetEncoding("GBK").GetBytes(password ?? string.Empty);
             Array.Copy(passwordBytes, 0, pLoginInfo.sPassword, 0, Math.Min(passwordBytes.Length, pLoginInfo.sPassword.Length));
 
-            // 执行登录
-            _logger.LogInformation($"开始登录设备 : {deviceIp}" +
-                $", 用户名 : {userName}, 密码 : {password}" +
-                $", 端口 : {devicePort}");
+            _logger.LogInformation($"开始登录设备 : {deviceIp}, 用户名 : {userName}, 密码 : {password}, 端口 : {devicePort}");
             lUserID = CHCNetSDK.NET_DVR_Login_V40(ref pLoginInfo, ref lpDeviceInfo);
             _logger.LogInformation($"设备登录结果 : {lUserID}");
             if (lUserID < 0)
@@ -111,20 +93,11 @@ namespace HikAcessControl
             return true;
         }
 
-        /// <summary>
-        /// 开门操作（默认门序号1、命令1-打开），兼容旧调用
-        /// </summary>
         public bool OpenGetway()
         {
             return ControlGateway(1, 1);
         }
 
-        /// <summary>
-        /// 门控/梯控：远程门禁控制或梯控控制（NET_DVR_ControlGateway）
-        /// </summary>
-        /// <param name="lGatewayIndex">门禁序号(楼层编号、锁ID)，从1开始；-1 表示对所有门或梯控所有楼层操作</param>
-        /// <param name="dwStaic">命令值：0-关闭 1-打开 2-常开 3-常关 4-恢复</param>
-        /// <returns>是否成功</returns>
         public bool ControlGateway(int lGatewayIndex, uint dwStaic)
         {
             if (lUserID < 0)
@@ -168,19 +141,17 @@ namespace HikAcessControl
             IntPtr urlPtr = IntPtr.Zero;
             try
             {
-                // 根据海康官方文档，NET_DVR_JSON_CONFIG命令的lpInBuffer应该直接是URL字符串指针
-                // cbStateCallback应该设置为NULL
                 byte[] urlBytes = Encoding.UTF8.GetBytes(requestUrl);
                 urlPtr = Marshal.AllocHGlobal(urlBytes.Length + 1);
                 Marshal.Copy(urlBytes, 0, urlPtr, urlBytes.Length);
-                Marshal.WriteByte(urlPtr, urlBytes.Length, 0); // null结尾
+                Marshal.WriteByte(urlPtr, urlBytes.Length, 0);
 
                 int handle = CHCNetSDK.NET_DVR_StartRemoteConfig(
                     lUserID,
                     CHCNetSDK.NET_DVR_JSON_CONFIG,
-                    urlPtr,                    // 直接传URL字符串指针
-                    urlBytes.Length,           // URL字符串长度
-                    null!,                     // 回调设置为NULL
+                    urlPtr,
+                    urlBytes.Length,
+                    null!,
                     IntPtr.Zero);
 
                 if (handle < 0)
@@ -243,12 +214,8 @@ namespace HikAcessControl
                 inStructPtr = Marshal.AllocHGlobal(structSize);
                 Marshal.StructureToPtr(inCfg, inStructPtr, false);
 
-                // 关键修复：输出参数直接使用字节缓冲区，而不是结构体！
-                // 海康SDK的NET_DVR_SendWithRecvRemoteConfig对于NET_DVR_JSON_CONFIG命令，
-                // 输出参数是直接的数据缓冲区，不是NET_DVR_JSON_DATA_CFG结构体
                 const int outBufferSize = 64 * 1024;
                 outBufferPtr = Marshal.AllocHGlobal(outBufferSize);
-                // 清零输出缓冲区
                 for (int i = 0; i < Math.Min(outBufferSize, 1024); i++)
                 {
                     Marshal.WriteByte(outBufferPtr, i, 0);
@@ -272,7 +239,6 @@ namespace HikAcessControl
                     return status;
                 }
 
-                // 从输出缓冲区直接读取数据
                 if (outDataLen > 0 && outDataLen <= outBufferSize)
                 {
                     byte[] outBytes = new byte[outDataLen];
@@ -282,7 +248,6 @@ namespace HikAcessControl
                 }
                 else
                 {
-                    // 尝试扫描缓冲区找到数据
                     byte[] scanBuffer = new byte[Math.Min(outBufferSize, 4096)];
                     Marshal.Copy(outBufferPtr, scanBuffer, 0, scanBuffer.Length);
                     int dataEnd = Array.IndexOf(scanBuffer, (byte)0);
@@ -330,12 +295,6 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 仅查询删除进度（假定删除命令已通过 HTTP 或其他方式下发）。建立长连接循环 GetNextRemoteConfig 直到进度 success 或结束。
-        /// </summary>
-        /// <param name="progressTimeoutMs">超时时间（毫秒）</param>
-        /// <param name="errorMessage">失败时的错误信息</param>
-        /// <returns>是否删除完成（进度为 success）</returns>
         public bool PollDeleteProgress(int progressTimeoutMs, out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -357,12 +316,11 @@ namespace HikAcessControl
             IntPtr outBufferPtr = IntPtr.Zero;
             try
             {
-                const int outBufferSize = 4096;
+                const int outBufferSize = 1024 * 64;
                 outBufferPtr = Marshal.AllocHGlobal(outBufferSize);
                 var sw = Stopwatch.StartNew();
                 bool deleteSuccess = false;
 
-                // 3. 循环调用 NET_DVR_GetNextRemoteConfig 逐条获取删除进度（UserInfoDetailDeleteProcess JSON）
                 while (sw.ElapsedMilliseconds < progressTimeoutMs)
                 {
                     for (int i = 0; i < outBufferSize; i++)
@@ -379,7 +337,6 @@ namespace HikAcessControl
                         return false;
                     }
 
-                    // 从缓冲区读取 JSON
                     byte[] outBytes = new byte[outBufferSize];
                     Marshal.Copy(outBufferPtr, outBytes, 0, outBufferSize);
                     int dataEnd = Array.IndexOf(outBytes, (byte)0);
@@ -432,9 +389,6 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 解析 UserInfoDetailDeleteProcess 报文，判断 progress 是否为 success
-        /// </summary>
         private static bool IsDeleteProgressSuccess(string responseJson)
         {
             if (string.IsNullOrWhiteSpace(responseJson))
@@ -452,7 +406,6 @@ namespace HikAcessControl
                     return string.Equals(statusStr, "OK", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(statusStr, "success", StringComparison.OrdinalIgnoreCase);
                 }
-                // 设备可能返回 progress 或 status 表示完成
                 var progress = process["progress"]?.ToString();
                 var statusVal = process["status"]?.ToString();
                 return string.Equals(progress, "success", StringComparison.OrdinalIgnoreCase) ||
@@ -478,10 +431,6 @@ namespace HikAcessControl
                 .Replace("\t", "\\t");
         }
 
-        /// <summary>
-        /// 直接缓冲区方式发送和接收远程配置（参考官方C++示例）
-        /// 输入输出都是直接的字节缓冲区，而不是结构体
-        /// </summary>
         public int SendWithRecvRemoteConfigDirect(int handle, string inputJson, out string outputJson, out string errorMessage)
         {
             outputJson = string.Empty;
@@ -496,25 +445,19 @@ namespace HikAcessControl
             IntPtr outBufferPtr = IntPtr.Zero;
             try
             {
-                // 输入缓冲区：直接使用 JSON 字符串（参考官方示例）
                 byte[] inJsonBytes = Encoding.UTF8.GetBytes(inputJson);
-                // 分配足够大的缓冲区（官方示例用 1024）
                 int inBufferSize = Math.Max(inJsonBytes.Length + 1, 1024);
                 inBufferPtr = Marshal.AllocHGlobal(inBufferSize);
-                // 清零缓冲区
                 for (int i = 0; i < inBufferSize; i++)
                 {
                     Marshal.WriteByte(inBufferPtr, i, 0);
                 }
-                // 复制 JSON 数据
                 Marshal.Copy(inJsonBytes, 0, inBufferPtr, inJsonBytes.Length);
                 
                 _logger.LogInformation($"输入缓冲区大小：{inBufferSize}，JSON长度：{inJsonBytes.Length}");
 
-                // 输出缓冲区（官方示例用 1024 * 4）
-                const int outBufferSize = 1024 * 4;
+                const int outBufferSize = 1024 * 64;
                 outBufferPtr = Marshal.AllocHGlobal(outBufferSize);
-                // 清零输出缓冲区
                 for (int i = 0; i < outBufferSize; i++)
                 {
                     Marshal.WriteByte(outBufferPtr, i, 0);
@@ -538,7 +481,6 @@ namespace HikAcessControl
                     return -1;
                 }
 
-                // 从输出缓冲区读取数据
                 if (outDataLen > 0 && outDataLen <= outBufferSize)
                 {
                     byte[] outBytes = new byte[outDataLen];
@@ -547,7 +489,6 @@ namespace HikAcessControl
                 }
                 else
                 {
-                    // 尝试扫描缓冲区找到数据
                     byte[] scanBuffer = new byte[outBufferSize];
                     Marshal.Copy(outBufferPtr, scanBuffer, 0, outBufferSize);
                     int dataEnd = Array.IndexOf(scanBuffer, (byte)0);
@@ -579,17 +520,8 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 下发人脸到设备（新增或修改）- 按官方文档实现
-        /// </summary>
-        /// <param name="employeeNo">人员工号FPID（用于关联人员）</param>
-        /// <param name="name">人员姓名（可选）</param>
-        /// <param name="faceImageBytes">人脸图片二进制数据</param>
-        /// <param name="fdid">人脸库ID，默认为1</param>
-        /// <returns>元组：(是否成功, 设备响应内容)</returns>
         public (bool success, string deviceResponse) AddFaceToDevice(string employeeNo, string name, byte[] faceImageBytes, string fdid = "1")
         {
-            // 1. 基础校验（新增FDID数字校验，修复核心参数错误）
             if (lUserID < 0)
             {
                 return (false, "未登录设备");
@@ -615,7 +547,6 @@ namespace HikAcessControl
 
             try
             {
-                // 2. 建立长连接 - 按官方：char sFaceURL[1024]，传 sizeof(sFaceURL)=1024
                 const int urlBufferSize = 1024;
                 string url = "PUT /ISAPI/Intelligent/FDLib/FDSetUp?format=json";
                 byte[] urlBytes = Encoding.UTF8.GetBytes(url);
@@ -638,7 +569,6 @@ namespace HikAcessControl
                 }
                 _logger.LogInformation("建立下发人脸参数长连接成功");
 
-                // 3. 构建人脸JSON - 与官方一致：faceLibType、FDID、FPID、featurePointType
                 var faceConfig = new
                 {
                     faceLibType = "blackFD",
@@ -649,7 +579,6 @@ namespace HikAcessControl
                 string jsonData = JsonConvert.SerializeObject(faceConfig);
                 _logger.LogInformation($"下发人脸JSON：{jsonData}，图片大小：{faceImageBytes.Length}字节");
 
-                // 4. 按官方：一个 struUserRecord，lpJsonData 指向 C 风格字符串（带 \0），dwJsonDataSize=strlen（不含 \0）
                 byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
                 int jsonLen = jsonBytes.Length;
                 jsonPtr = Marshal.AllocHGlobal(jsonLen + 1);
@@ -675,7 +604,6 @@ namespace HikAcessControl
                 inStructPtr = Marshal.AllocHGlobal(structSize);
                 Marshal.StructureToPtr(faceDataStruct, inStructPtr, false);
 
-                // 5. 循环调用 - 与官方一致：每次传同一 &struUserRecord
                 string responseJson = string.Empty;
                 int status;
                 while (true)
@@ -731,7 +659,6 @@ namespace HikAcessControl
             }
             finally
             {
-                // 6. 释放所有资源（新增JSON/图片非托管内存，避免内存泄漏）
                 if (handle >= 0)
                 {
                     CHCNetSDK.NET_DVR_StopRemoteConfig(handle);
@@ -745,16 +672,13 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 按官方：传入已组好的 NET_DVR_JSON_DATA_CFG 指针，只做 SendWithRecv 与读响应
-        /// </summary>
         private int SendFaceDataRemoteConfigWithStruct(int handle, IntPtr inStructPtr, int structSize, out string responseJson)
         {
             responseJson = string.Empty;
             IntPtr outBufferPtr = IntPtr.Zero;
             try
             {
-                const int outBufferSize = 1024 * 8;
+                const int outBufferSize = 1024 * 64;
                 outBufferPtr = Marshal.AllocHGlobal(outBufferSize);
                 for (int i = 0; i < outBufferSize; i++)
                     Marshal.WriteByte(outBufferPtr, i, 0);
@@ -790,9 +714,6 @@ namespace HikAcessControl
             }
         }
 
-        /// <summary>
-        /// 检查ISAPI响应是否成功
-        /// </summary>
         private bool IsResponseStatusOk(string responseJson)
         {
             if (string.IsNullOrWhiteSpace(responseJson))
@@ -805,7 +726,7 @@ namespace HikAcessControl
                 if (doc.RootElement.TryGetProperty("statusCode", out var statusCode))
                 {
                     int code = statusCode.GetInt32();
-                    return code == 1 || code == 0; // 1=成功，0=OK
+                    return code == 1 || code == 0;
                 }
                 if (doc.RootElement.TryGetProperty("statusString", out var statusString))
                 {
@@ -816,7 +737,6 @@ namespace HikAcessControl
             }
             catch
             {
-                // 解析失败，尝试简单匹配
             }
             return responseJson.Contains("\"statusCode\":1") || 
                    responseJson.Contains("\"statusString\":\"OK\"", StringComparison.OrdinalIgnoreCase);
@@ -839,7 +759,6 @@ namespace HikAcessControl
             IntPtr statusPtr = IntPtr.Zero;
             try
             {
-                // 海康 SDK 要求请求 URL 为 C 风格字符串（以 \0 结尾），否则可能返回错误码 17（参数错误）
                 byte[] urlBytes = Encoding.ASCII.GetBytes(requestUrl);
                 int urlBufLen = urlBytes.Length + 1;
                 urlPtr = Marshal.AllocHGlobal(urlBufLen);
@@ -850,7 +769,6 @@ namespace HikAcessControl
                 if (!string.IsNullOrWhiteSpace(inputXml))
                 {
                     inputBytes = Encoding.UTF8.GetBytes(inputXml);
-                    // 输入缓冲区也以 \0 结尾，避免参数错误
                     int inBufLen = inputBytes.Length + 1;
                     inputPtr = Marshal.AllocHGlobal(inBufLen);
                     Marshal.Copy(inputBytes, 0, inputPtr, inputBytes.Length);
@@ -863,7 +781,6 @@ namespace HikAcessControl
                 byte[] statusBytes = new byte[8 * 1024];
                 statusPtr = Marshal.AllocHGlobal(statusBytes.Length);
 
-                // 文档：dwRequestUrlLen/dwInBufferSize 通常包含字符串结束符 \0，否则易报错误码 17
                 uint urlLen = (uint)urlBufLen;
                 uint inLen = inputPtr != IntPtr.Zero ? (uint)(inputBytes.Length + 1) : 0u;
 
@@ -875,8 +792,8 @@ namespace HikAcessControl
                     lpInBuffer = inputPtr,
                     dwInBufferSize = inLen,
                     dwRecvTimeOut = 5000,
-                    byForceEncrpt = 0,   // 0-否，不强制加密
-                    byRes = new byte[31] // 保留，置为0
+                    byForceEncrpt = 0,
+                    byRes = new byte[31]
                 };
 
                 var outputCfg = new CHCNetSDK.NET_DVR_XML_CONFIG_OUTPUT
@@ -889,10 +806,9 @@ namespace HikAcessControl
                     dwStatusSize = (uint)statusBytes.Length,
                     lpDataBuffer = IntPtr.Zero,
                     byNumOfMultiPart = 0,
-                    byRes = new byte[23] // 保留，置为0
+                    byRes = new byte[23]
                 };
 
-                // 使用 IntPtr 重载，避免 ref 结构体封送导致参数错误 17
                 IntPtr inputStructPtr = IntPtr.Zero;
                 IntPtr outputStructPtr = IntPtr.Zero;
                 try
@@ -979,10 +895,6 @@ namespace HikAcessControl
             return text.Trim('\0', '\r', '\n', ' ');
         }
 
-        /// <summary>
-        /// 与 NET_DVR_XML_CONFIG_INPUT 布局一致，供 NET_DVR_JSON_CONFIG 使用。
-        /// 海康文档：建立长连接时回调置 NULL；URL 与 XML 透传一致（无 null 结尾，长度为字节数）。
-        /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         private struct NET_DVR_JSON_CONFIG_INPUT
         {
@@ -996,12 +908,6 @@ namespace HikAcessControl
             public byte[] byRes;
         }
 
-        /// <summary>
-        /// 采集人脸图片（使用报警回调，识别到后直接保存本地）
-        /// </summary>
-        /// <param name="saveDirectory">保存目录（为空则仅返回字节）</param>
-        /// <param name="maxWaitMs">最长等待时间</param>
-        /// <returns>人脸图片结果，失败返回null</returns>
         public FaceCaptureResult? CaptureFaceImage(string? saveDirectory = null, int maxWaitMs = 10000)
         {
             LastFaceCaptureErrorMessage = string.Empty;
@@ -1144,10 +1050,10 @@ namespace HikAcessControl
                 }
                 CHCNetSDK.NET_DVR_CAPTURE_FACE_CFG RemoteGet = new CHCNetSDK.NET_DVR_CAPTURE_FACE_CFG();
                 RemoteGet.init();
-                const int facePicMaxSize = 200 * 1024;       // 人脸图片缓冲区大小（200K）
+                const int facePicMaxSize = 200 * 1024;
                 facePicPtr = Marshal.AllocHGlobal(facePicMaxSize);
-                RemoteGet.pFacePicBuffer = facePicPtr;               // 绑定人脸图片缓冲区
-                RemoteGet.dwFacePicSize = facePicMaxSize;            // 告诉SDK：人脸图片缓冲区的最大大小
+                RemoteGet.pFacePicBuffer = facePicPtr;
+                RemoteGet.dwFacePicSize = facePicMaxSize;
                 RemoteGet.pFaceTemplate1Buffer = IntPtr.Zero;
                 RemoteGet.dwFaceTemplate1Size = 0;
                 RemoteGet.pFaceTemplate2Buffer = IntPtr.Zero;
@@ -1166,54 +1072,34 @@ namespace HikAcessControl
                     if (status == -1)
                     {
                         lastError = (int)CHCNetSDK.NET_DVR_GetLastError();
-                        _logger.LogError($"获取人脸采集结果失败，错误码：{lastError}");
-                        LastFaceCaptureErrorMessage = $"获取人脸采集结果失败，错误码：{lastError}";
+                        LastFaceCaptureErrorMessage = $"获取人脸图片失败，错误码：{lastError}";
                         return (null, lastError);
                     }
-                    RemoteGet = Marshal.PtrToStructure<CHCNetSDK.NET_DVR_CAPTURE_FACE_CFG>(outPtr);
-                    if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_NEED_WAIT)
+
+                    if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_SUCCESS)
                     {
-                        Thread.Sleep(100);
-                        continue;
-                    }
-                    if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_FAILED)
-                    {
-                        lastError = (int)CHCNetSDK.NET_DVR_GetLastError();
-                        _logger.LogError($"获取人脸采集结果失败，错误码：{lastError}");
-                        LastFaceCaptureErrorMessage = $"获取人脸采集结果失败，错误码：{lastError}";
-                        return (null, lastError);
-                    }
-                    if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_SUCCESS ||
-                        status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_FINISH)
-                    {
-                        _logger.LogInformation($"获取人脸采集结果成功，进度：{RemoteGet.byCaptureProgress}");
-                        if (RemoteGet.byCaptureProgress == 100 &&
-                            RemoteGet.dwFacePicSize > 0 &&
-                            RemoteGet.pFacePicBuffer != IntPtr.Zero)
+                        RemoteGet = Marshal.PtrToStructure<CHCNetSDK.NET_DVR_CAPTURE_FACE_CFG>(outPtr);
+                        if (RemoteGet.dwFacePicSize > 0 && RemoteGet.pFacePicBuffer != IntPtr.Zero)
                         {
                             byte[] faceBytes = new byte[RemoteGet.dwFacePicSize];
-                            Marshal.Copy(RemoteGet.pFacePicBuffer, faceBytes, 0, faceBytes.Length);
-                            var result = new FaceCaptureResult
-                            {
-                                FaceBytes = faceBytes
-                            };
+                            Marshal.Copy(RemoteGet.pFacePicBuffer, faceBytes, 0, (int)RemoteGet.dwFacePicSize);
+                            var result = new FaceCaptureResult { FaceBytes = faceBytes };
                             if (!string.IsNullOrWhiteSpace(saveDirectory))
                             {
                                 Directory.CreateDirectory(saveDirectory);
                                 string fileName = $"face_{DateTime.Now:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}.jpg";
                                 string filePath = Path.Combine(saveDirectory, fileName);
                                 File.WriteAllBytes(filePath, faceBytes);
-                                _logger.LogInformation($"保存人脸图片成功，文件路径：{filePath}\n文件名：{fileName}");
                                 result.SavedFileName = fileName;
                                 result.SavedFilePath = filePath;
                             }
                             return (result, 0);
                         }
-                        if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_FINISH)
-                        {
-                            LastFaceCaptureErrorMessage = "人脸采集已结束但未获取到图片";
-                            return (null, lastError);
-                        }
+                    }
+                    if (status == CHCNetSDK.NET_SDK_GET_NEXT_STATUS_FINISH)
+                    {
+                        LastFaceCaptureErrorMessage = "人脸采集已结束但未获取到图片";
+                        return (null, lastError);
                     }
 
                     Thread.Sleep(100);
@@ -1256,135 +1142,23 @@ namespace HikAcessControl
             }
         }
 
-        private bool HasFaceCaptureAbility(out string? abilityPreview)
-        {
-            abilityPreview = null;
-            if (lUserID < 0)
-            {
-                LastFaceCaptureErrorMessage = "未登录设备";
-                return false;
-            }
-
-            const int abilityBufferSize = 128 * 1024;
-            IntPtr outPtr = IntPtr.Zero;
-            try
-            {
-                outPtr = Marshal.AllocHGlobal(abilityBufferSize);
-                bool ok = CHCNetSDK.NET_DVR_GetDeviceAbility(
-                    lUserID,
-                    CHCNetSDK.DEVICE_ABILITY_INFO,
-                    IntPtr.Zero,
-                    0,
-                    outPtr,
-                    abilityBufferSize);
-                if (!ok)
-                {
-                    int err = (int)CHCNetSDK.NET_DVR_GetLastError();
-                    _logger.LogError($"获取设备能力失败，错误码：{err}");
-                    LastFaceCaptureErrorMessage = $"获取设备能力失败，错误码：{err}";
-                    return false;
-                }
-
-                var outBytes = new byte[abilityBufferSize];
-                Marshal.Copy(outPtr, outBytes, 0, outBytes.Length);
-                string textUtf8 = DecodeBufferToString(outBytes, (uint)outBytes.Length);
-                string textGbk = DecodeBufferToString(outBytes, (uint)outBytes.Length, Encoding.GetEncoding("GBK"));
-                string text = textUtf8.Contains('\uFFFD') && !string.IsNullOrWhiteSpace(textGbk)
-                    ? textGbk
-                    : textUtf8;
-
-                if (text.Length > 512)
-                {
-                    abilityPreview = text.Substring(0, 512);
-                }
-                else
-                {
-                    abilityPreview = text;
-                }
-
-                return text.Contains("CaptureFaceData", StringComparison.OrdinalIgnoreCase) ||
-                       text.Contains("captureFace", StringComparison.OrdinalIgnoreCase) ||
-                       text.Contains("CAPTURE_FACE", StringComparison.OrdinalIgnoreCase);
-            }
-            finally
-            {
-                if (outPtr != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(outPtr);
-                }
-            }
-        }
-
-        private static string DecodeBufferToString(byte[] buffer, uint length, Encoding encoding)
-        {
-            if (buffer == null || buffer.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            int actualLength = (int)Math.Min(buffer.Length, length);
-            string text = encoding.GetString(buffer, 0, actualLength);
-            return text.Trim('\0', '\r', '\n', ' ');
-        }
-
-        /// <summary>
-        /// 远程配置状态回调。查看最近一次回调内容：调试时读 <see cref="LastRemoteConfigCallbackInfo"/>，
-        /// 或查看 Debug 输出（Visual Studio 输出窗口）。
-        /// </summary>
-        public static (uint DwType, uint DwBufLen, string? BufferPreview) LastRemoteConfigCallbackInfo { get; private set; }
-
-        private static void OnCardRemoteConfigCallback(uint dwType, IntPtr lpBuffer, uint dwBufLen, IntPtr pUserData)
-        {
-            string? preview = null;
-            if (lpBuffer != IntPtr.Zero && dwBufLen > 0)
-            {
-                int len = (int)Math.Min(dwBufLen, 256);
-                var buf = new byte[len];
-                Marshal.Copy(lpBuffer, buf, 0, len);
-                try { preview = Encoding.UTF8.GetString(buf).TrimEnd('\0'); } catch { preview = Convert.ToHexString(buf); }
-            }
-            LastRemoteConfigCallbackInfo = (dwType, dwBufLen, preview);
-            Debug.WriteLine($"[RemoteConfig] dwType={dwType}, dwBufLen={dwBufLen}, preview={preview ?? "(null)"}");
-        }
-
         private (FaceCaptureResult? result, int lastError) TryCaptureFaceByAlarm(int maxWaitMs, string? saveDirectory)
         {
             int lastError = 0;
-            FaceCaptureContext? context = null;
-            GCHandle ctxHandle = default;
+            bool alarmResult = false;
             int alarmHandle = -1;
-
+            GCHandle ctxHandle = default;
             try
             {
-                context = new FaceCaptureContext(_logger, saveDirectory);
+                var context = new FaceCaptureContext(_logger, saveDirectory);
                 ctxHandle = GCHandle.Alloc(context);
-
-                if (!CHCNetSDK.NET_DVR_SetDVRMessageCallBack_V31(FaceAlarmCallback, GCHandle.ToIntPtr(ctxHandle)))
+                alarmResult = CHCNetSDK.NET_DVR_SetDVRMessageCallBack_V31(FaceAlarmCallback, GCHandle.ToIntPtr(ctxHandle));
+                if (!alarmResult)
                 {
                     lastError = (int)CHCNetSDK.NET_DVR_GetLastError();
-                    _logger.LogError($"设置报警回调失败，错误码：{lastError}");
+                    LastFaceCaptureErrorMessage = $"设置报警回调失败,错误码：{lastError}";
                     return (null, lastError);
                 }
-
-                CHCNetSDK.NET_DVR_SETUPALARM_PARAM alarmParam = new CHCNetSDK.NET_DVR_SETUPALARM_PARAM
-                {
-                    dwSize = (uint)Marshal.SizeOf<CHCNetSDK.NET_DVR_SETUPALARM_PARAM>(),
-                    byLevel = 1,
-                    byRetAlarmTypeV40 = 1,
-                    byRetDevInfoVersion = 1,
-                    byFaceAlarmDetection = 1,
-                    byDeployType = 1,
-                    byAlarmTypeURL = 0
-                };
-
-                alarmHandle = CHCNetSDK.NET_DVR_SetupAlarmChan_V41(lUserID, ref alarmParam);
-                if (alarmHandle < 0)
-                {
-                    lastError = (int)CHCNetSDK.NET_DVR_GetLastError();
-                    _logger.LogError($"报警布防失败，错误码：{lastError}");
-                    return (null, lastError);
-                }
-                _logger.LogInformation($"报警布防成功，handle={alarmHandle}");
 
                 if (context.Completed.Wait(maxWaitMs))
                 {
@@ -1408,6 +1182,494 @@ namespace HikAcessControl
                 if (ctxHandle.IsAllocated)
                 {
                     ctxHandle.Free();
+                }
+            }
+        }
+
+        private static void OnCardRemoteConfigCallback(uint dwType, IntPtr lpBuffer, uint dwBufLen, IntPtr pUserData)
+        {
+        }
+
+        /// <summary>
+        /// 关闭M1卡加密功能
+        /// </summary>
+        /// <returns>(是否成功, 错误信息)</returns>
+        public (bool success, string errorMessage) DisableM1CardEncryption()
+        {
+            if (lUserID < 0)
+            {
+                return (false, "未登录设备");
+            }
+
+            try
+            {
+                // 使用PUT方法设置卡片安全配置
+                string url = "PUT /ISAPI/AccessControl/CardSecurity";
+                string xmlBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                    "<CardSecurity xmlns=\"http://www.isapi.org/ver20/XMLSchema\">" +
+                    "<cardAuthenMode>off</cardAuthenMode>" +
+                    "</CardSecurity>"; 
+
+                _logger.LogInformation($"关闭M1卡加密：URL={url}，Body={xmlBody}");
+
+                // 使用STDXMLConfig发送请求
+                if (!StdXmlConfig(url, xmlBody, out string output, out string status, out string errorMessage))
+                {
+                    _logger.LogWarning($"关闭M1卡加密失败：{errorMessage}");
+                    return (false, errorMessage);
+                }
+
+                _logger.LogInformation($"关闭M1卡加密成功，响应：{output}");
+                return (true, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "关闭M1卡加密异常");
+                return (false, $"关闭M1卡加密异常：{ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 创建用户信息
+        /// </summary>
+        /// <param name="employeeNo">员工编号</param>
+        /// <param name="name">姓名（可选）</param>
+        /// <param name="beginTime">开始时间</param>
+        /// <param name="endTime">结束时间</param>
+        /// <returns>(是否成功, 设备响应, 错误信息)</returns>
+        public (bool success, string deviceResponse, string errorMessage) CreateUserInfo(string employeeNo, string? name = null, string? beginTime = null, string? endTime = null)
+        {
+            if (lUserID < 0)
+            {
+                return (false, string.Empty, "未登录设备");
+            }
+            if (string.IsNullOrWhiteSpace(employeeNo))
+            {
+                return (false, string.Empty, "员工编号不能为空");
+            }
+
+            int handle = -1;
+            try
+            {
+                string url = "PUT /ISAPI/AccessControl/UserInfo/SetUp?format=json";
+                handle = StartJsonRemoteConfig(url, 1, out string startErr);
+                if (handle < 0)
+                {
+                    return (false, string.Empty, startErr);
+                }
+                _logger.LogInformation("建立用户信息下发长连接成功");
+
+                var sb = new StringBuilder();
+                sb.Append("{\"UserInfo\":{");
+                sb.Append($"\"employeeNo\":\"{EscapeJsonString(employeeNo)}\",");
+                sb.Append($"\"name\":\"{EscapeJsonString(name ?? employeeNo)}\",");
+                sb.Append("\"userType\":\"normal\"");
+                
+                if (!string.IsNullOrWhiteSpace(beginTime) || !string.IsNullOrWhiteSpace(endTime))
+                {
+                    sb.Append(",\"Valid\":{");
+                    sb.Append("\"enable\":true,");
+                    sb.Append($"\"beginTime\":\"{beginTime ?? string.Empty}\",");
+                    sb.Append($"\"endTime\":\"{endTime ?? string.Empty}\",");
+                    sb.Append("\"timeType\":\"local\"");
+                    sb.Append("}");
+                }
+                
+                sb.Append(",\"doorRight\":\"1\"");
+                sb.Append(",\"RightPlan\":[{\"doorNo\":1,\"planTemplateNo\":\"1\"}]");
+                
+                sb.Append("}}");
+                string jsonBody = sb.ToString();
+                _logger.LogInformation($"下发用户信息JSON：{jsonBody}");
+
+                string responseJson = string.Empty;
+                int status;
+                while (true)
+                {
+                    status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
+                    _logger.LogInformation($"用户信息下发返回：status={status}，响应={responseJson}");
+
+                    if (status == -1)
+                    {
+                        uint errCode = CHCNetSDK.NET_DVR_GetLastError();
+                        return (false, responseJson, $"NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：{errCode}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
+                    {
+                        _logger.LogInformation("配置等待...");
+                        Thread.Sleep(10);
+                        continue;
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FAILED)
+                    {
+                        return (false, responseJson, $"下发用户信息失败：{responseJson}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_EXCEPTION)
+                    {
+                        return (false, responseJson, $"下发用户信息异常：{responseJson}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_SUCCESS)
+                    {
+                        if (!IsResponseStatusOk(responseJson))
+                        {
+                            return (false, responseJson, string.IsNullOrWhiteSpace(responseJson) ? "下发用户信息失败" : responseJson);
+                        }
+                        return (true, responseJson, "下发用户信息成功");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FINISH)
+                    {
+                        if (!IsResponseStatusOk(responseJson))
+                        {
+                            return (false, responseJson, string.IsNullOrWhiteSpace(responseJson) ? "下发用户信息失败" : responseJson);
+                        }
+                        return (true, responseJson, "下发用户信息完成");
+                    }
+                    else
+                    {
+                        return (false, responseJson, $"下发用户信息未知状态：{status}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "下发用户信息业务逻辑异常");
+                return (false, string.Empty, $"下发用户信息异常：{ex.Message}");
+            }
+            finally
+            {
+                if (handle >= 0)
+                {
+                    StopRemoteConfig(handle);
+                    _logger.LogInformation("已关闭用户信息下发长连接");
+                }
+            }
+        }
+
+        public (bool success, string deviceResponse, string errorMessage) AddCardToDevice(string employeeNo, string cardNo, int cardType = 1, string? beginTime = null, string? endTime = null)
+        {
+            if (lUserID < 0)
+            {
+                return (false, string.Empty, "未登录设备");
+            }
+            if (string.IsNullOrWhiteSpace(employeeNo))
+            {
+                return (false, string.Empty, "人员工号不能为空");
+            }
+            if (string.IsNullOrWhiteSpace(cardNo))
+            {
+                return (false, string.Empty, "卡片编号不能为空");
+            }
+
+            // 先创建用户信息
+            var (userSuccess, userResponse, userError) = CreateUserInfo(employeeNo, employeeNo, beginTime, endTime);
+            if (!userSuccess)
+            {
+                _logger.LogWarning($"创建用户信息失败：{userError}，继续尝试添加卡片");
+            }
+            else
+            {
+                _logger.LogInformation($"创建用户信息成功：{userResponse}");
+            }
+
+            // 步骤1：查询卡片是否已存在
+            _logger.LogInformation($"开始查询卡片：employeeNo={employeeNo}, cardNo={cardNo}");
+            var (hasCard, checkError) = CheckCardExists(employeeNo, cardNo);
+            if (!string.IsNullOrWhiteSpace(checkError))
+            {
+                _logger.LogWarning($"查询卡片失败：{checkError}，继续尝试添加");
+            }
+
+            // 步骤2：如果卡片已存在，先删除
+            if (hasCard)
+            {
+                _logger.LogInformation($"卡片已存在，先删除：employeeNo={employeeNo}, cardNo={cardNo}");
+                var (deleteSuccess, deleteResponse, deleteError) = DeleteCard(employeeNo, cardNo);
+                if (!deleteSuccess)
+                {
+                    _logger.LogError($"删除卡片失败：{deleteError}，无法继续添加卡片");
+                    return (false, deleteResponse, $"删除卡片失败：{deleteError}");
+                }
+                else
+                {
+                    _logger.LogInformation($"删除卡片成功：{deleteResponse}");
+                    Thread.Sleep(500);
+                }
+            }
+
+            // 步骤3：添加卡片
+            int handle = -1;
+            try
+            {
+                // 使用POST方法添加卡片（只支持新增）
+                string url = "POST /ISAPI/AccessControl/CardInfo/Record?format=json";
+                handle = StartJsonRemoteConfig(url, 1, out string startErr);
+                if (handle < 0)
+                {
+                    return (false, string.Empty, startErr);
+                }
+                _logger.LogInformation("建立卡片下发长连接成功");
+
+                // 构建卡片信息JSON - 只有在有时间限制时才添加Valid字段
+                var sb = new StringBuilder();
+                sb.Append("{\"CardInfo\":{");
+                sb.Append($"\"employeeNo\":\"{EscapeJsonString(employeeNo)}\",");
+                sb.Append($"\"cardNo\":\"{EscapeJsonString(cardNo)}\",");
+                sb.Append("\"cardType\":\"normalCard\"");
+                
+                if (!string.IsNullOrWhiteSpace(beginTime) && !string.IsNullOrWhiteSpace(endTime))
+                {
+                    sb.Append(",\"Valid\":{");
+                    sb.Append("\"enable\":true,");
+                    sb.Append($"\"beginTime\":\"{beginTime}\",");
+                    sb.Append($"\"endTime\":\"{endTime}\",");
+                    sb.Append("\"timeType\":\"local\"");
+                    sb.Append("}");
+                }
+                
+                sb.Append("}}");
+                string jsonBody = sb.ToString();
+                _logger.LogInformation($"下发卡片JSON：{jsonBody}");
+
+                string responseJson = string.Empty;
+                int status;
+                while (true)
+                {
+                    status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
+                    _logger.LogInformation($"卡片下发返回：status={status}，响应={responseJson}");
+
+                    if (status == -1)
+                    {
+                        uint errCode = CHCNetSDK.NET_DVR_GetLastError();
+                        return (false, responseJson, $"NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：{errCode}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
+                    {
+                        _logger.LogInformation("配置等待...");
+                        Thread.Sleep(10);
+                        continue;
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FAILED)
+                    {
+                        return (false, responseJson, $"下发卡片失败：{responseJson}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_EXCEPTION)
+                    {
+                        return (false, responseJson, $"下发卡片异常：{responseJson}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_SUCCESS)
+                    {
+                        if (!IsResponseStatusOk(responseJson))
+                        {
+                            return (false, responseJson, string.IsNullOrWhiteSpace(responseJson) ? "下发卡片失败" : responseJson);
+                        }
+                        return (true, responseJson, "下发卡片成功");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FINISH)
+                    {
+                        if (!IsResponseStatusOk(responseJson))
+                        {
+                            return (false, responseJson, string.IsNullOrWhiteSpace(responseJson) ? "下发卡片失败" : responseJson);
+                        }
+                        return (true, responseJson, "下发卡片完成");
+                    }
+                    else
+                    {
+                        return (false, responseJson, $"下发卡片未知状态：{status}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "下发卡片业务逻辑异常");
+                return (false, string.Empty, $"下发卡片异常：{ex.Message}");
+            }
+            finally
+            {
+                if (handle >= 0)
+                {
+                    StopRemoteConfig(handle);
+                    _logger.LogInformation("已关闭卡片下发长连接");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 查询指定员工是否有卡片
+        /// </summary>
+        /// <param name="employeeNo">员工编号</param>
+        /// <param name="cardNo">卡片编号（可选，不传则查询该员工所有卡片）</param>
+        /// <returns>(是否有卡片, 错误信息)</returns>
+        public (bool hasCard, string errorMessage) CheckCardExists(string employeeNo, string? cardNo = null)
+        {
+            if (lUserID < 0)
+            {
+                return (false, "未登录设备");
+            }
+            if (string.IsNullOrWhiteSpace(employeeNo))
+            {
+                return (false, "员工编号不能为空");
+            }
+
+            int handle = -1;
+            try
+            {
+                string url = "POST /ISAPI/AccessControl/CardInfo/Search?format=json";
+                handle = StartJsonRemoteConfig(url, 1, out string startErr);
+                if (handle < 0)
+                {
+                    return (false, startErr);
+                }
+                _logger.LogInformation($"建立查询卡片长连接成功，employeeNo={employeeNo}");
+
+                var sb = new StringBuilder();
+                sb.Append("{\"CardInfoSearchCond\":{");
+                sb.Append($"\"searchID\":\"{DateTime.Now:yyyyMMddHHmmssfff}\",");
+                sb.Append("\"maxResults\":30,");
+                sb.Append("\"searchResultPosition\":0");
+                if (!string.IsNullOrWhiteSpace(cardNo))
+                {
+                    sb.Append($",\"cardNo\":\"{EscapeJsonString(cardNo)}\"");
+                }
+                sb.Append("}}");
+                string jsonBody = sb.ToString();
+                _logger.LogInformation($"查询卡片请求：{jsonBody}");
+
+                string responseJson = string.Empty;
+                int status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
+                _logger.LogInformation($"查询卡片响应：status={status}, response={responseJson}");
+
+                if (status == -1)
+                {
+                    return (false, $"查询卡片失败：{sendErr}");
+                }
+
+                try
+                {
+                    var node = JsonConvert.DeserializeObject<Newtonsoft.Json.Linq.JObject>(responseJson);
+                    var cardInfoList = node?["CardInfoSearch"]?["CardInfo"];
+                    if (cardInfoList is Newtonsoft.Json.Linq.JArray array)
+                    {
+                        foreach (var item in array)
+                        {
+                            string? foundEmployeeNo = item["employeeNo"]?.ToString();
+                            string? foundCardNo = item["cardNo"]?.ToString();
+                            if (string.Equals(foundEmployeeNo, employeeNo, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (string.IsNullOrWhiteSpace(cardNo) || string.Equals(foundCardNo, cardNo, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _logger.LogInformation($"找到卡片：employeeNo={foundEmployeeNo}, cardNo={foundCardNo}");
+                                    return (true, string.Empty);
+                                }
+                            }
+                        }
+                    }
+                    return (false, string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "解析查询卡片响应失败，默认视为无卡片");
+                    return (false, string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "查询卡片业务逻辑异常");
+                return (false, $"查询卡片异常：{ex.Message}");
+            }
+            finally
+            {
+                if (handle >= 0)
+                {
+                    StopRemoteConfig(handle);
+                    _logger.LogInformation("已关闭查询卡片长连接");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除指定员工的卡片
+        /// </summary>
+        /// <param name="employeeNo">员工编号</param>
+        /// <param name="cardNo">卡片编号</param>
+        /// <returns>(是否成功, 设备响应, 错误信息)</returns>
+        public (bool success, string deviceResponse, string errorMessage) DeleteCard(string employeeNo, string cardNo)
+        {
+            if (lUserID < 0)
+            {
+                return (false, string.Empty, "未登录设备");
+            }
+            if (string.IsNullOrWhiteSpace(employeeNo))
+            {
+                return (false, string.Empty, "员工编号不能为空");
+            }
+            if (string.IsNullOrWhiteSpace(cardNo))
+            {
+                return (false, string.Empty, "卡片编号不能为空");
+            }
+
+            int handle = -1;
+            try
+            {
+                string url = "PUT /ISAPI/AccessControl/CardInfo/Delete?format=json";
+                handle = StartJsonRemoteConfig(url, 1, out string startErr);
+                if (handle < 0)
+                {
+                    return (false, string.Empty, startErr);
+                }
+                _logger.LogInformation($"建立删除卡片长连接成功，employeeNo={employeeNo}, cardNo={cardNo}");
+
+                var sb = new StringBuilder();
+                sb.Append("{\"CardInfoDelCond\":{");
+                sb.Append("\"CardNoList\":[{");
+                sb.Append($"\"cardNo\":\"{EscapeJsonString(cardNo)}\"");
+                sb.Append("}]}}");
+                string jsonBody = sb.ToString();
+                _logger.LogInformation($"删除卡片请求：{jsonBody}");
+
+                string responseJson = string.Empty;
+                int status;
+                while (true)
+                {
+                    status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
+                    _logger.LogInformation($"删除卡片返回：status={status}，响应={responseJson}");
+
+                    if (status == -1)
+                    {
+                        uint errCode = CHCNetSDK.NET_DVR_GetLastError();
+                        return (false, responseJson, $"NET_DVR_SendWithRecvRemoteConfig接口调用失败，错误码：{errCode}");
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
+                    {
+                        _logger.LogInformation("配置等待...");
+                        Thread.Sleep(10);
+                        continue;
+                    }
+                    else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_SUCCESS ||
+                             status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FINISH)
+                    {
+                        if (!IsResponseStatusOk(responseJson))
+                        {
+                            return (false, responseJson, string.IsNullOrWhiteSpace(responseJson) ? "删除卡片失败" : responseJson);
+                        }
+                        return (true, responseJson, "删除卡片成功");
+                    }
+                    else
+                    {
+                        return (false, responseJson, $"删除卡片失败：{responseJson}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "删除卡片业务逻辑异常");
+                return (false, string.Empty, $"删除卡片异常：{ex.Message}");
+            }
+            finally
+            {
+                if (handle >= 0)
+                {
+                    StopRemoteConfig(handle);
+                    _logger.LogInformation("已关闭删除卡片长连接");
                 }
             }
         }

@@ -1229,7 +1229,8 @@ namespace WebCameraApi.Services
 
                 var statusStr = searchNode["responseStatusStrg"]?.ToString() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(statusStr) &&
-                    !string.Equals(statusStr, "OK", StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(statusStr, "OK", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(statusStr, "more", StringComparison.OrdinalIgnoreCase))
                 {
                     if (string.Equals(statusStr, "NO MATCH", StringComparison.OrdinalIgnoreCase))
                     {
@@ -1560,7 +1561,7 @@ namespace WebCameraApi.Services
                 // 构造设备操作结果
                 var deviceResult = new HikAcScreenStatusDeviceResultDto
                 {
-                    IP = ip,
+                    IP = ip ?? string.Empty,
                     AcName = request.AcName,
                     IsSuccess = true,
                     Message = "屏幕状态更新成功",
@@ -1583,7 +1584,7 @@ namespace WebCameraApi.Services
                 // 构造失败的设备操作结果
                 var deviceResult = new HikAcScreenStatusDeviceResultDto
                 {
-                    IP = request.IP,
+                    IP = request.IP ?? string.Empty,
                     AcName = request.AcName,
                     IsSuccess = false,
                     Message = status.message,
@@ -1592,6 +1593,128 @@ namespace WebCameraApi.Services
                 response.Results.Add(deviceResult);
                 
                 return (response, status);
+            }
+        }
+
+        /// <summary>
+        /// 添加卡片到门禁设备
+        /// </summary>
+        public async Task<(HikAcCardAddResponseDto response, StatusDto status)> AddCardToHikAc(HikAcCardAddRequestDto request)
+        {
+            var response = new HikAcCardAddResponseDto
+            {
+                UserID = request?.UserID ?? string.Empty,
+                CardNo = request?.CardNo ?? string.Empty
+            };
+            var status = new StatusDto { isSuccess = false };
+
+            if (request == null)
+            {
+                status.message = "添加卡片参数为空";
+                return (response, status);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.UserID))
+            {
+                status.message = "人员工号不能为空";
+                return (response, status);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.CardNo))
+            {
+                status.message = "卡片编号不能为空";
+                return (response, status);
+            }
+
+            try
+            {
+                foreach (var device in request.Devices ?? new List<HikAcDeviceDto>())
+                {
+                    var deviceResult = await AddCardToDevice(device, request);
+                    response.Results.Add(deviceResult);
+                }
+
+                if (response.Results.Count == 0)
+                {
+                    status.message = "添加卡片失败：未提供门禁设备";
+                    return (response, status);
+                }
+
+                status.isSuccess = response.Results.All(item => item.IsSuccess);
+                status.message = status.isSuccess ? "添加卡片成功" : "添加卡片完成（部分失败）";
+                return (response, status);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "添加卡片信息失败");
+                status.message = $"添加卡片异常：{ex.Message}";
+                return (response, status);
+            }
+        }
+
+        private async Task<HikAcCardAddDeviceResultDto> AddCardToDevice(HikAcDeviceDto device, HikAcCardAddRequestDto request)
+        {
+            var result = new HikAcCardAddDeviceResultDto
+            {
+                HikAcIP = device.HikAcIP,
+                HikAcPort = device.HikAcPort,
+                AcName = device.AcName
+            };
+
+            if (string.IsNullOrWhiteSpace(device.HikAcIP) ||
+                string.IsNullOrWhiteSpace(device.HikAcUserName) ||
+                string.IsNullOrWhiteSpace(device.HikAcPassword))
+            {
+                result.IsSuccess = false;
+                result.Message = "门禁IP/账号/密码不能为空";
+                return result;
+            }
+
+            try
+            {
+                string? beginTime = NormalizeHikTime(request.StartTime);
+                string? endTime = NormalizeHikTime(request.EndTime);
+
+                // 使用SDK长连接方式添加卡片
+                HikAC hikAc = new HikAC(_logger);
+                
+                // 登录设备
+                bool loginResult = hikAc.LoginAC(device.HikAcIP, (ushort)device.HikAcPort, device.HikAcUserName, device.HikAcPassword);
+                if (!loginResult)
+                {
+                    result.IsSuccess = false;
+                    result.Message = $"设备登录失败";
+                    return result;
+                }
+
+                try
+                {
+                    // 使用SDK的AddCardToDevice方法
+                    var (success, deviceResponse, errorMessage) = hikAc.AddCardToDevice(
+                        request.UserID,
+                        request.CardNo,
+                        1,
+                        beginTime,
+                        endTime
+                    );
+
+                    result.IsSuccess = success;
+                    result.Message = success ? "添加卡片成功" : errorMessage;
+                    result.DeviceResponse = deviceResponse;
+                    return result;
+                }
+                finally
+                {
+                    // 登出设备
+                    hikAc.Logout();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"向设备 [{device.HikAcIP}:{device.HikAcPort}] 添加卡片异常");
+                result.IsSuccess = false;
+                result.Message = $"添加卡片异常：{ex.Message}";
+                return result;
             }
         }
     }

@@ -440,5 +440,81 @@ namespace WebCameraApi.Controllers
             }
         }
 
+        /// <summary>
+        /// 添加卡片到门禁设备
+        /// </summary>
+        /// <param name="request">添加卡片请求参数</param>
+        /// <remarks>
+        /// 请求示例：
+        /// {
+        ///   "devices": [
+        ///     {
+        ///       "hikAcIP": "192.168.1.10",
+        ///       "hikAcPort": 8000,
+        ///       "hikAcUserName": "admin",
+        ///       "hikAcPassword": "12345",
+        ///       "acName": "A门禁"
+        ///     }
+        ///   ],
+        ///   "userID": "1001",
+        ///   "cardNo": "1234567890",
+        ///   "startTime": "2026-01-01 00:00:00",
+        ///   "endTime": "2026-12-31 23:59:59"
+        /// }
+        /// </remarks>
+        [HttpPost("addCard")]
+        [ProducesResponseType(typeof(ApiResponseDto<HikAcCardAddResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AddCard([FromBody] HikAcCardAddRequestDto request)
+        {
+            if (request == null)
+            {
+                var errorMsg = "调用addCard接口失败：请求参数不能为空";
+                _logger.LogWarning(errorMsg);
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
+            }
+
+            if (request.Devices == null || request.Devices.Count == 0)
+            {
+                var errorMsg = "调用addCard接口失败：门禁设备列表不能为空";
+                _logger.LogWarning(errorMsg);
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.UserID))
+            {
+                var errorMsg = "调用addCard接口失败：人员工号(UserID)不能为空";
+                _logger.LogWarning(errorMsg);
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.CardNo))
+            {
+                var errorMsg = "调用addCard接口失败：卡片编号(CardNo)不能为空";
+                _logger.LogWarning(errorMsg);
+                return Ok(ApiResponseDto.Fail(errorMsg, 400));
+            }
+
+            try
+            {
+                var (response, status) = await _hikAcService.AddCardToHikAc(request);
+                if (status.isSuccess)
+                {
+                    _logger.LogInformation("addCard接口调用成功：{UserId}-{CardNo}", request.UserID, request.CardNo);
+                }
+                else
+                {
+                    _logger.LogWarning("addCard接口调用失败：{UserId}-{CardNo}，原因：{Message}", request.UserID, request.CardNo, status.message);
+                }
+
+                return Ok(ApiResponseDto<HikAcCardAddResponseDto>.Success(response, status.message));
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"addCard接口调用异常：{request?.UserID}-{request?.CardNo}";
+                _logger.LogError(ex, errorMsg);
+                return Ok(ApiResponseDto<HikAcCardAddResponseDto>.Fail(errorMsg, 400, new HikAcCardAddResponseDto()));
+            }
+        }
+
     }
 }

@@ -385,4 +385,54 @@ namespace WebCameraApi.Dto
         /// </summary>
         public List<HikAcScreenStatusDeviceResultDto> Results { get; set; } = new();
     }
+
+    /// <summary>
+    /// 添加卡片请求DTO
+    /// </summary>
+    public class HikAcCardAddRequestDto
+    {
+        /// <summary>
+        /// 门禁设备列表
+        /// </summary>
+        public List<HikAcDeviceDto> Devices { get; set; } = new();
+        /// <summary>
+        /// 人员工号
+        /// </summary>
+        public string UserID { get; set; } = string.Empty;
+        /// <summary>
+        /// 卡片编号
+        /// </summary>
+        public string CardNo { get; set; } = string.Empty;
+        /// <summary>
+        /// 有效期开始时间
+        /// </summary>
+        public string? StartTime { get; set; }
+        /// <summary>
+        /// 有效期结束时间
+        /// </summary>
+        public string? EndTime { get; set; }
+    }
+
+    /// <summary>
+    /// 单设备添加卡片结果
+    /// </summary>
+    public class HikAcCardAddDeviceResultDto
+    {
+        public string HikAcIP { get; set; } = string.Empty;
+        public ushort HikAcPort { get; set; } = 8000;
+        public string AcName { get; set; } = string.Empty;
+        public bool IsSuccess { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string DeviceResponse { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// 添加卡片响应DTO
+    /// </summary>
+    public class HikAcCardAddResponseDto
+    {
+        public string UserID { get; set; } = string.Empty;
+        public string CardNo { get; set; } = string.Empty;
+        public List<HikAcCardAddDeviceResultDto> Results { get; set; } = new();
+    }
 }

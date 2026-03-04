@@ -93,6 +93,9 @@ namespace WebCameraApi
             #endregion
 
             #region HttpClient配置
+            // 从配置文件中读取海康威视的用户名和密码
+            var hikUser = builder.Configuration["海康威视:用户名"];
+            var hikPass = builder.Configuration["海康威视:密码"];
             // 注册命名的HttpClient实例，名称为"hik"，用于调用海康威视相关接口
             builder.Services.AddHttpClient("hik", client =>
             {
@@ -103,7 +106,9 @@ namespace WebCameraApi
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false, // 禁用自动重定向，避免请求被意外重定向
-                UseCookies = false         // 禁用Cookie，避免跨请求携带Cookie导致的问题
+                UseCookies = false,         // 禁用Cookie，避免跨请求携带Cookie导致的问题
+                Credentials = new System.Net.NetworkCredential(hikUser, hikPass),
+                PreAuthenticate = true
             });
             #endregion
 
@@ -138,9 +143,9 @@ namespace WebCameraApi
             // 注册海康AC服务为Scoped生命周期
             builder.Services.AddScoped<HikAcService>();
 
-            // 注册海康报警服务（HikAlarmService）为Scoped生命周期
-            // Scoped：每个HTTP请求创建一个新的服务实例
-            builder.Services.AddScoped<HikAlarmService>();
+            // 注册海康报警服务（HikAlarmService）为Singleton生命周期
+            // Singleton：整个应用程序共享一个服务实例，避免重复初始化
+            builder.Services.AddSingleton<HikAlarmService>();
 
             // 注册 UDP 客户端服务（智能柜/志信锁控板等）
             builder.Services.AddScoped<UdpClientService>();

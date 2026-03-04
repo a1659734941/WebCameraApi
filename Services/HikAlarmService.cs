@@ -283,69 +283,90 @@ namespace WebCameraApi.Services
                 jsonString = await reader.ReadToEndAsync();
 
                 // 修正语法错误：空值/格式校验
-                if (string.IsNullOrWhiteSpace(jsonString) || (!jsonString.TrimStart().StartsWith('{') && !jsonString.TrimStart().StartsWith('[')))
+                if (string.IsNullOrWhiteSpace(jsonString))
                 {
-                    _logger.LogError($"无效的 JSON 格式 - 原始数据: {jsonString}");
+                    _logger.LogError("JSON数据为空");
                     return;
                 }
 
-                using var doc = JsonDocument.Parse(jsonString);
-                var root = doc.RootElement;
-
-                // 修正语法错误：闭合括号
-                if (!root.TryGetProperty("eventType", out var eventTypeProp) || !root.TryGetProperty("dateTime", out var dateTimeProp))
+                if (!jsonString.TrimStart().StartsWith('{') && !jsonString.TrimStart().StartsWith('['))
                 {
-                    _logger.LogError($"缺少必要字段: eventType/dateTime");
+                    _logger.LogError($"无效的 JSON 格式 - 原始数据长度: {jsonString.Length}, 前50字符: {jsonString.Substring(0, Math.Min(50, jsonString.Length))}");
                     return;
                 }
 
-                var eventType = eventTypeProp.GetString();
-                if (string.IsNullOrEmpty(eventType))
+                try
                 {
-                    _logger.LogError("eventType 为空");
-                    return;
+                    using var doc = JsonDocument.Parse(jsonString);
+                    var root = doc.RootElement;
+
+                    // 修正语法错误：闭合括号
+                    if (!root.TryGetProperty("eventType", out var eventTypeProp) || !root.TryGetProperty("dateTime", out var dateTimeProp))
+                    {
+                        _logger.LogError($"缺少必要字段: eventType/dateTime");
+                        return;
+                    }
+
+                    var eventType = eventTypeProp.GetString();
+                    if (string.IsNullOrEmpty(eventType))
+                    {
+                        _logger.LogError("eventType 为空");
+                        return;
+                    }
+
+                    if (!DateTime.TryParse(dateTimeProp.GetString(), out var eventTime))
+                    {
+                        _logger.LogError($"无效的时间日期格式 : {dateTimeProp.GetString()}");
+                        return;
+                    }
+
+                    var httpClient = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient("hik");
+                    var record = new HikAlarmRecordDto();
+                    record.Id = Guid.NewGuid();
+                    record.EventType = eventType;
+                    record.EventTime = eventTime;
+
+                    // 获取设备名称
+                    var deviceName = root.TryGetProperty("targetAttrs", out var attrs) && attrs.TryGetProperty("deviceName", out var deviceNameProp)
+                              ? deviceNameProp.GetString() ?? "未知设备"
+                              : "未知设备";
+
+                    record.DeviceName = deviceName;
+                    string channelNameValue = null;
+                    if (attrs.TryGetProperty("channelName", out var channelName))
+                    {
+                        channelNameValue = channelName.GetString();
+                    }
+                    else if (attrs.TryGetProperty("channel", out var channel))
+                    {
+                        channelNameValue = channel.ToString();
+                    }
+                    record.ChannelName = channelNameValue;
+                    record.TaskName = attrs.TryGetProperty("taskname", out var taskName)
+                              ? taskName.GetString()
+                              : null;
+
+                    // 核心修改：下载图片到本地，获取文件路径（替代Base64）
+                    var imageUrl = ExtractImageUrl(root, eventType);
+                    record.SnapshotBase64Path = await DownloadImageToLocalAsync(httpClient, imageUrl, deviceName, eventType, eventTime);
+
+                    record.RawData = root.ToString()!;
+
+                    bool InsertSuccess = await _PgHikAlarmRecord.InsertHikAlarmRecordAsync(_connectionString, record);
+                    if (InsertSuccess)
+                    {
+                        _logger.LogInformation("新增一条行为分析记录到数据库中，图片路径：{ImagePath}", record.SnapshotBase64Path);
+                        return;
+                    }
+                    else
+                    {
+                        _logger.LogError("新增行为分析记录到数据库中失败");
+                        return;
+                    }
                 }
-
-                if (!DateTime.TryParse(dateTimeProp.GetString(), out var eventTime))
+                catch (JsonException ex)
                 {
-                    _logger.LogError($"无效的时间日期格式 : {dateTimeProp.GetString()}");
-                    return;
-                }
-
-                var httpClient = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient("hik");
-                var record = new HikAlarmRecordDto();
-                record.Id = Guid.NewGuid();
-                record.EventType = eventType;
-                record.EventTime = eventTime;
-
-                // 获取设备名称
-                var deviceName = root.TryGetProperty("targetAttrs", out var attrs) && attrs.TryGetProperty("deviceName", out var deviceNameProp)
-                          ? deviceNameProp.GetString() ?? "未知设备"
-                          : "未知设备";
-
-                record.DeviceName = deviceName;
-                record.ChannelName = attrs.TryGetProperty("channelName", out var channelName)
-                          ? channelName.GetString()
-                          : null;
-                record.TaskName = attrs.TryGetProperty("taskname", out var taskName)
-                          ? taskName.GetString()
-                          : null;
-
-                // 核心修改：下载图片到本地，获取文件路径（替代Base64）
-                var imageUrl = ExtractImageUrl(root, eventType);
-                record.SnapshotBase64Path = await DownloadImageToLocalAsync(httpClient, imageUrl, deviceName, eventType, eventTime);
-
-                record.RawData = root.ToString()!;
-
-                bool InsertSuccess = await _PgHikAlarmRecord.InsertHikAlarmRecordAsync(_connectionString, record);
-                if (InsertSuccess)
-                {
-                    _logger.LogInformation("新增一条行为分析记录到数据库中，图片路径：{ImagePath}", record.SnapshotBase64Path);
-                    return;
-                }
-                else
-                {
-                    _logger.LogError("新增行为分析记录到数据库中失败");
+                    _logger.LogError(ex, $"JSON解析异常 - 错误行: {ex.LineNumber}, 行内位置: {ex.BytePositionInLine}, 原始数据前100字符: {jsonString.Substring(0, Math.Min(100, jsonString.Length))}");
                     return;
                 }
             }
