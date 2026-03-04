@@ -81,15 +81,12 @@ namespace HikAcessControl
             byte[] passwordBytes = Encoding.GetEncoding("GBK").GetBytes(password ?? string.Empty);
             Array.Copy(passwordBytes, 0, pLoginInfo.sPassword, 0, Math.Min(passwordBytes.Length, pLoginInfo.sPassword.Length));
 
-            _logger.LogInformation($"开始登录设备 : {deviceIp}, 用户名 : {userName}, 密码 : {password}, 端口 : {devicePort}");
             lUserID = CHCNetSDK.NET_DVR_Login_V40(ref pLoginInfo, ref lpDeviceInfo);
-            _logger.LogInformation($"设备登录结果 : {lUserID}");
             if (lUserID < 0)
             {
                 _logger.LogError($"设备 : {deviceIp} 登录失败，错误码：{CHCNetSDK.NET_DVR_GetLastError()}");
                 return false;
             }
-            _logger.LogInformation($"设备 : {deviceIp} 登录成功");
             return true;
         }
 
@@ -106,11 +103,7 @@ namespace HikAcessControl
                 return false;
             }
             bool ok = CHCNetSDK.NET_DVR_ControlGateway(lUserID, lGatewayIndex, dwStaic);
-            if (ok)
-            {
-                _logger.LogInformation("门控/梯控操作执行成功，序号={Index}，命令={Cmd}", lGatewayIndex, dwStaic);
-            }
-            else
+            if (!ok)
             {
                 _logger.LogError("门控/梯控失败，错误码：{Code}", CHCNetSDK.NET_DVR_GetLastError());
             }
@@ -192,8 +185,6 @@ namespace HikAcessControl
             try
             {
                 int structSize = Marshal.SizeOf<CHCNetSDK.NET_DVR_JSON_DATA_CFG>();
-                _logger.LogInformation($"NET_DVR_JSON_DATA_CFG结构体大小：{structSize}字节，IntPtr大小：{IntPtr.Size}字节，Is64Bit：{Environment.Is64BitProcess}");
-                _logger.LogInformation($"输入JSON：{inputJson}");
 
                 byte[] inJsonBytes = Encoding.UTF8.GetBytes(inputJson);
                 inJsonHandle = GCHandle.Alloc(inJsonBytes, GCHandleType.Pinned);
@@ -208,8 +199,6 @@ namespace HikAcessControl
                     lpInfraredFacePicBuffer = IntPtr.Zero,
                     byRes = new byte[248]
                 };
-
-                _logger.LogInformation($"输入结构体：dwSize={inCfg.dwSize}，lpJsonData={inCfg.lpJsonData}，dwJsonDataSize={inCfg.dwJsonDataSize}");
 
                 inStructPtr = Marshal.AllocHGlobal(structSize);
                 Marshal.StructureToPtr(inCfg, inStructPtr, false);
@@ -231,7 +220,6 @@ namespace HikAcessControl
                     ref outDataLen);
 
                 uint lastError = CHCNetSDK.NET_DVR_GetLastError();
-                _logger.LogInformation($"SendWithRecvRemoteConfig调用完成，status={status}，outDataLen={outDataLen}，错误码={lastError}");
                 
                 if (status < 0)
                 {
@@ -244,7 +232,6 @@ namespace HikAcessControl
                     byte[] outBytes = new byte[outDataLen];
                     Marshal.Copy(outBufferPtr, outBytes, 0, (int)outDataLen);
                     outputJson = Encoding.UTF8.GetString(outBytes).Trim('\0', '\r', '\n', ' ');
-                    _logger.LogInformation($"从输出缓冲区读取到{outDataLen}字节数据：[{outputJson}]");
                 }
                 else
                 {
@@ -254,7 +241,6 @@ namespace HikAcessControl
                     if (dataEnd > 0)
                     {
                         outputJson = Encoding.UTF8.GetString(scanBuffer, 0, dataEnd).Trim('\0', '\r', '\n', ' ');
-                        _logger.LogInformation($"扫描缓冲区找到{dataEnd}字节数据：[{outputJson}]");
                     }
                     else
                     {
@@ -453,8 +439,6 @@ namespace HikAcessControl
                     Marshal.WriteByte(inBufferPtr, i, 0);
                 }
                 Marshal.Copy(inJsonBytes, 0, inBufferPtr, inJsonBytes.Length);
-                
-                _logger.LogInformation($"输入缓冲区大小：{inBufferSize}，JSON长度：{inJsonBytes.Length}");
 
                 const int outBufferSize = 1024 * 64;
                 outBufferPtr = Marshal.AllocHGlobal(outBufferSize);
@@ -473,7 +457,6 @@ namespace HikAcessControl
                     ref outDataLen);
 
                 uint lastError = CHCNetSDK.NET_DVR_GetLastError();
-                _logger.LogInformation($"SendWithRecvRemoteConfig返回：status={status}，outDataLen={outDataLen}，错误码={lastError}");
                 
                 if (status == -1)
                 {
@@ -498,7 +481,6 @@ namespace HikAcessControl
                     }
                 }
 
-                _logger.LogInformation($"输出内容：{outputJson}");
                 return status;
             }
             catch (Exception ex)
@@ -567,8 +549,6 @@ namespace HikAcessControl
                     uint errCode = CHCNetSDK.NET_DVR_GetLastError();
                     return (false, $"建立下发人脸参数长连接失败，错误码：{errCode}");
                 }
-                _logger.LogInformation("建立下发人脸参数长连接成功");
-
                 var faceConfig = new
                 {
                     faceLibType = "blackFD",
@@ -577,7 +557,6 @@ namespace HikAcessControl
                     featurePointType = "face"
                 };
                 string jsonData = JsonConvert.SerializeObject(faceConfig);
-                _logger.LogInformation($"下发人脸JSON：{jsonData}，图片大小：{faceImageBytes.Length}字节");
 
                 byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
                 int jsonLen = jsonBytes.Length;
@@ -609,7 +588,6 @@ namespace HikAcessControl
                 while (true)
                 {
                     status = SendFaceDataRemoteConfigWithStruct(handle, inStructPtr, structSize, out responseJson);
-                    _logger.LogInformation($"人脸下发返回：status={status}，响应={responseJson}");
 
                     if (status == -1)
                     {
@@ -618,7 +596,7 @@ namespace HikAcessControl
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                     {
-                        _logger.LogInformation("配置等待...");
+                        
                         Thread.Sleep(10);
                         continue;
                     }
@@ -662,13 +640,11 @@ namespace HikAcessControl
                 if (handle >= 0)
                 {
                     CHCNetSDK.NET_DVR_StopRemoteConfig(handle);
-                    _logger.LogInformation("已关闭人脸下发长连接");
                 }
                 if (urlPtr != IntPtr.Zero) Marshal.FreeHGlobal(urlPtr);
                 if (inStructPtr != IntPtr.Zero) Marshal.FreeHGlobal(inStructPtr);
                 if (jsonPtr != IntPtr.Zero) Marshal.FreeHGlobal(jsonPtr);
                 if (picPtr != IntPtr.Zero) Marshal.FreeHGlobal(picPtr);
-                _logger.LogInformation("已释放所有非托管内存，避免内存泄漏");
             }
         }
 
@@ -1210,16 +1186,12 @@ namespace HikAcessControl
                     "<cardAuthenMode>off</cardAuthenMode>" +
                     "</CardSecurity>"; 
 
-                _logger.LogInformation($"关闭M1卡加密：URL={url}，Body={xmlBody}");
-
                 // 使用STDXMLConfig发送请求
                 if (!StdXmlConfig(url, xmlBody, out string output, out string status, out string errorMessage))
                 {
                     _logger.LogWarning($"关闭M1卡加密失败：{errorMessage}");
                     return (false, errorMessage);
                 }
-
-                _logger.LogInformation($"关闭M1卡加密成功，响应：{output}");
                 return (true, string.Empty);
             }
             catch (Exception ex)
@@ -1257,8 +1229,6 @@ namespace HikAcessControl
                 {
                     return (false, string.Empty, startErr);
                 }
-                _logger.LogInformation("建立用户信息下发长连接成功");
-
                 var sb = new StringBuilder();
                 sb.Append("{\"UserInfo\":{");
                 sb.Append($"\"employeeNo\":\"{EscapeJsonString(employeeNo)}\",");
@@ -1280,14 +1250,12 @@ namespace HikAcessControl
                 
                 sb.Append("}}");
                 string jsonBody = sb.ToString();
-                _logger.LogInformation($"下发用户信息JSON：{jsonBody}");
 
                 string responseJson = string.Empty;
                 int status;
                 while (true)
                 {
                     status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
-                    _logger.LogInformation($"用户信息下发返回：status={status}，响应={responseJson}");
 
                     if (status == -1)
                     {
@@ -1296,7 +1264,7 @@ namespace HikAcessControl
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                     {
-                        _logger.LogInformation("配置等待...");
+                        
                         Thread.Sleep(10);
                         continue;
                     }
@@ -1340,7 +1308,6 @@ namespace HikAcessControl
                 if (handle >= 0)
                 {
                     StopRemoteConfig(handle);
-                    _logger.LogInformation("已关闭用户信息下发长连接");
                 }
             }
         }
@@ -1400,7 +1367,6 @@ namespace HikAcessControl
                 {
                     return (false, string.Empty, startErr);
                 }
-                _logger.LogInformation("建立卡片下发长连接成功");
 
                 // 构建卡片信息JSON - 只有在有时间限制时才添加Valid字段
                 var sb = new StringBuilder();
@@ -1421,14 +1387,12 @@ namespace HikAcessControl
                 
                 sb.Append("}}");
                 string jsonBody = sb.ToString();
-                _logger.LogInformation($"下发卡片JSON：{jsonBody}");
 
                 string responseJson = string.Empty;
                 int status;
                 while (true)
                 {
                     status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
-                    _logger.LogInformation($"卡片下发返回：status={status}，响应={responseJson}");
 
                     if (status == -1)
                     {
@@ -1437,7 +1401,7 @@ namespace HikAcessControl
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                     {
-                        _logger.LogInformation("配置等待...");
+                        
                         Thread.Sleep(10);
                         continue;
                     }
@@ -1481,7 +1445,7 @@ namespace HikAcessControl
                 if (handle >= 0)
                 {
                     StopRemoteConfig(handle);
-                    _logger.LogInformation("已关闭卡片下发长连接");
+
                 }
             }
         }
@@ -1512,8 +1476,6 @@ namespace HikAcessControl
                 {
                     return (false, startErr);
                 }
-                _logger.LogInformation($"建立查询卡片长连接成功，employeeNo={employeeNo}");
-
                 var sb = new StringBuilder();
                 sb.Append("{\"CardInfoSearchCond\":{");
                 sb.Append($"\"searchID\":\"{DateTime.Now:yyyyMMddHHmmssfff}\",");
@@ -1525,11 +1487,9 @@ namespace HikAcessControl
                 }
                 sb.Append("}}");
                 string jsonBody = sb.ToString();
-                _logger.LogInformation($"查询卡片请求：{jsonBody}");
 
                 string responseJson = string.Empty;
                 int status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
-                _logger.LogInformation($"查询卡片响应：status={status}, response={responseJson}");
 
                 if (status == -1)
                 {
@@ -1550,7 +1510,6 @@ namespace HikAcessControl
                             {
                                 if (string.IsNullOrWhiteSpace(cardNo) || string.Equals(foundCardNo, cardNo, StringComparison.OrdinalIgnoreCase))
                                 {
-                                    _logger.LogInformation($"找到卡片：employeeNo={foundEmployeeNo}, cardNo={foundCardNo}");
                                     return (true, string.Empty);
                                 }
                             }
@@ -1574,7 +1533,6 @@ namespace HikAcessControl
                 if (handle >= 0)
                 {
                     StopRemoteConfig(handle);
-                    _logger.LogInformation("已关闭查询卡片长连接");
                 }
             }
         }
@@ -1629,7 +1587,7 @@ namespace HikAcessControl
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                     {
-                        _logger.LogInformation("配置等待...");
+                        
                         Thread.Sleep(10);
                         continue;
                     }
@@ -1658,7 +1616,6 @@ namespace HikAcessControl
                 if (handle >= 0)
                 {
                     StopRemoteConfig(handle);
-                    _logger.LogInformation("已关闭删除卡片长连接");
                 }
             }
         }

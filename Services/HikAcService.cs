@@ -288,7 +288,7 @@ namespace WebCameraApi.Services
                 return (response, status);
             }
 
-            _logger.LogInformation($"开始下发人脸，工号：{request.EmployeeNo}，姓名：{request.Name}，图片大小：{faceImageBytes.Length}字节");
+
 
             // FDID 规范化：空或非数字（如 Swagger 示例 "string"）时使用默认 "1"
             string fdid = !string.IsNullOrWhiteSpace(request.FDID) && Regex.IsMatch(request.FDID, @"^\d+$")
@@ -357,7 +357,7 @@ namespace WebCameraApi.Services
                 result.DeviceResponse = deviceResponse;
                 result.Message = success ? "下发人脸成功" : $"下发人脸失败：{deviceResponse}";
 
-                _logger.LogInformation($"设备 [{device.HikAcIP}:{device.HikAcPort}] 人脸下发结果：{(success ? "成功" : "失败")}，响应：{deviceResponse}");
+
 
                 return result;
             }
@@ -469,7 +469,7 @@ namespace WebCameraApi.Services
                 result.Message = success ? "删除用户成功" : $"删除用户失败：{progressErr}";
                 result.DeviceResponse = success ? string.Empty : progressErr;
 
-                _logger.LogInformation($"设备 [{device.HikAcIP}:{device.HikAcPort}] 删除用户结果：{(success ? "成功" : "失败")}，{progressErr}");
+
                 return result;
             }
             catch (Exception ex)
@@ -496,7 +496,7 @@ namespace WebCameraApi.Services
             string url = BuildIsapiUrl(device.HikAcIP, httpPort, path);
             // 设备要求带 mode，按工号删除使用 byEmployeeNo
             string jsonBody = "{\"UserInfoDetail\":{\"mode\":\"byEmployeeNo\",\"employeeNo\":\"" + EscapeJsonString(employeeNo) + "\"}}";
-            _logger.LogInformation($"HTTP 删除人员：URL={url}，Body={jsonBody}");
+
 
             try
             {
@@ -557,8 +557,6 @@ namespace WebCameraApi.Services
                     _logger.LogWarning($"建立下发人员参数长连接失败 [{device.HikAcIP}:{device.HikAcPort}] : {startError}");
                     return result;
                 }
-                _logger.LogInformation($"建立下发人员参数长连接成功，handle={handle}");
-                
                 // 构建 JSON 请求体（参考官方示例格式）
                 string? beginTime = NormalizeHikTime(request.StartTime);
                 string? endTime = NormalizeHikTime(request.EndTime);
@@ -585,7 +583,6 @@ namespace WebCameraApi.Services
                 
                 sb.Append("}}");
                 string body = sb.ToString();
-                _logger.LogInformation($"下发人员请求体：{body}");
 
                 string responseText = string.Empty;
                 int status = -1;
@@ -595,7 +592,6 @@ namespace WebCameraApi.Services
                 while (true)
                 {
                     status = hikAc.SendWithRecvRemoteConfigDirect(handle, body, out responseText, out sendError);
-                    _logger.LogInformation($"下发人员响应：status={status}，响应={responseText}");
                     
                     if (status == -1)
                     {
@@ -606,7 +602,6 @@ namespace WebCameraApi.Services
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                     {
-                        _logger.LogInformation("配置等待...");
                         await Task.Delay(10);
                         continue;
                     }
@@ -628,7 +623,6 @@ namespace WebCameraApi.Services
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_SUCCESS)
                     {
-                        _logger.LogInformation($"下发人员成功：{responseText}");
                         result.IsSuccess = true;
                         result.Message = "下发人员成功";
                         result.DeviceResponse = responseText;
@@ -636,7 +630,6 @@ namespace WebCameraApi.Services
                     }
                     else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FINISH)
                     {
-                        _logger.LogInformation("下发人员完成");
                         result.IsSuccess = true;
                         result.Message = "下发人员完成";
                         result.DeviceResponse = responseText;
@@ -701,7 +694,6 @@ namespace WebCameraApi.Services
 
                 // 使用官方示例的 URL 格式
                 string url = "POST /ISAPI/AccessControl/UserInfo/Search?format=json";
-                _logger.LogInformation($"查询人员开始，URL={url}");
                 handle = hikAc.StartJsonRemoteConfig(url, 1, out string startError);
                 if (handle < 0)
                 {
@@ -710,7 +702,6 @@ namespace WebCameraApi.Services
                     _logger.LogWarning($"建立查询人员参数长连接失败：{startError}");
                     return result;
                 }
-                _logger.LogInformation($"建立查询人员参数长连接成功，handle={handle}");
 
                 const int pageSize = 30;
                 int position = 0;
@@ -721,7 +712,6 @@ namespace WebCameraApi.Services
                 while (true)
                 {
                     string body = BuildUserSearchBody(request.UserID, request.UserName, position, pageSize, searchId);
-                    _logger.LogInformation($"查询人员请求体：{body}");
                     string responseText = string.Empty;
                     int status = -1;
                     string sendError = string.Empty;
@@ -729,7 +719,6 @@ namespace WebCameraApi.Services
                     while (true)
                     {
                         status = hikAc.SendWithRecvRemoteConfigDirect(handle, body, out responseText, out sendError);
-                        _logger.LogInformation($"查询人员返回：status={status}，响应={responseText}");
                         
                         if (status == -1)
                         {
@@ -740,7 +729,6 @@ namespace WebCameraApi.Services
                         }
                         else if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_NEEDWAIT)
                         {
-                            _logger.LogInformation("配置等待...");
                             await Task.Delay(10);
                             continue;
                         }
@@ -784,7 +772,6 @@ namespace WebCameraApi.Services
                             // FINISH状态且响应为空，表示设备上没有用户，视为正常结束
                             if (status == (int)CHCNetSDK.NET_SDK_SENDWITHRECV_STATUS.NET_SDK_CONFIG_STATUS_FINISH)
                             {
-                                _logger.LogInformation("设备返回FINISH状态且无数据，视为无用户数据");
                                 break;
                             }
                             // SUCCESS状态但响应为空，可能是设备无数据或需要重试
@@ -1573,7 +1560,7 @@ namespace WebCameraApi.Services
                 status.isSuccess = true;
                 status.message = "屏幕状态更新成功";
 
-                _logger.LogInformation("ScreenStatus接口调用成功：IP={IP}, BGP={BGP}", ip, request.BGP);
+
                 return (response, status);
             }
             catch (Exception ex)
