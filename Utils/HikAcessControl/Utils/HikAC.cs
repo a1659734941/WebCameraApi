@@ -1364,25 +1364,19 @@ namespace HikAcessControl
             var (userSuccess, userResponse, userError) = CreateUserInfo(employeeNo, employeeNo, beginTime, endTime);
             if (!userSuccess)
             {
-                _logger.LogWarning($"创建用户信息失败：{userError}，继续尝试添加卡片");
-            }
-            else
-            {
-                _logger.LogInformation($"创建用户信息成功：{userResponse}");
+                _logger.LogWarning($"创建用户信息失败：{userError}");
             }
 
             // 步骤1：查询卡片是否已存在
-            _logger.LogInformation($"开始查询卡片：employeeNo={employeeNo}, cardNo={cardNo}");
             var (hasCard, checkError) = CheckCardExists(employeeNo, cardNo);
             if (!string.IsNullOrWhiteSpace(checkError))
             {
-                _logger.LogWarning($"查询卡片失败：{checkError}，继续尝试添加");
+                _logger.LogWarning($"查询卡片失败：{checkError}");
             }
 
             // 步骤2：如果卡片已存在，先删除
             if (hasCard)
             {
-                _logger.LogInformation($"卡片已存在，先删除：employeeNo={employeeNo}, cardNo={cardNo}");
                 var (deleteSuccess, deleteResponse, deleteError) = DeleteCard(employeeNo, cardNo);
                 if (!deleteSuccess)
                 {
@@ -1391,7 +1385,6 @@ namespace HikAcessControl
                 }
                 else
                 {
-                    _logger.LogInformation($"删除卡片成功：{deleteResponse}");
                     Thread.Sleep(500);
                 }
             }
@@ -1616,22 +1609,18 @@ namespace HikAcessControl
                 {
                     return (false, string.Empty, startErr);
                 }
-                _logger.LogInformation($"建立删除卡片长连接成功，employeeNo={employeeNo}, cardNo={cardNo}");
-
                 var sb = new StringBuilder();
                 sb.Append("{\"CardInfoDelCond\":{");
                 sb.Append("\"CardNoList\":[{");
                 sb.Append($"\"cardNo\":\"{EscapeJsonString(cardNo)}\"");
                 sb.Append("}]}}");
                 string jsonBody = sb.ToString();
-                _logger.LogInformation($"删除卡片请求：{jsonBody}");
 
                 string responseJson = string.Empty;
                 int status;
                 while (true)
                 {
                     status = SendWithRecvRemoteConfigDirect(handle, jsonBody, out responseJson, out string sendErr);
-                    _logger.LogInformation($"删除卡片返回：status={status}，响应={responseJson}");
 
                     if (status == -1)
                     {
