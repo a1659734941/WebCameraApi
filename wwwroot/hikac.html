@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海康门禁控制 - WebCamera API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        .header h1 { font-size: 1.8em; }
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 20px;
+        }
+        .api-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .api-header {
+            padding: 15px 20px;
+            background: rgba(0,212,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .api-header h3 { font-size: 1.1em; }
+        .method-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .post { background: #49cc90; }
+        .get { background: #61affe; }
+        .api-body { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .device-section {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .section-title {
+            color: #00d4ff;
+            font-size: 0.95em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0,212,255,0.3);
+        }
+        .device-item {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .device-item:last-child { margin-bottom: 0; }
+        .device-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .device-row:last-child { margin-bottom: 0; }
+        .device-row input { 
+            padding: 8px 10px; 
+            font-size: 0.9em;
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            color: #fff;
+        }
+        .device-row input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .device-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+        .remove-btn {
+            padding: 6px 15px;
+            background: #dc3545;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .remove-btn:hover { background: #c82333; }
+        .add-btn {
+            padding: 8px 15px;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .add-btn:hover { background: #218838; }
+        .device-label {
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 返回</a>
+            <h1>🔐 海康门禁控制接口测试</h1>
+        </div>
+        
+        <div class="api-grid">
+            <!-- 门控/梯控 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>门控/梯控</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>设备IP</label>
+                            <input type="text" id="ac1_ip" value="192.168.2.8">
+                        </div>
+                        <div class="form-group">
+                            <label>端口</label>
+                            <input type="number" id="ac1_port" value="8000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>用户名</label>
+                            <input type="text" id="ac1_user" value="admin">
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <input type="password" id="ac1_pass" value="Hik12345">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>门禁名称</label>
+                            <input type="text" id="ac1_name" value="测试门禁">
+                        </div>
+                        <div class="form-group">
+                            <label>网关序号</label>
+                            <input type="number" id="ac1_index" value="1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>命令 (0-关闭 1-打开 2-常开 3-常关 4-恢复)</label>
+                        <select id="ac1_cmd">
+                            <option value="1">1 - 打开</option>
+                            <option value="0">0 - 关闭</option>
+                            <option value="2">2 - 常开</option>
+                            <option value="3">3 - 常关</option>
+                            <option value="4">4 - 恢复</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="testOpenHikAC()">执行</button>
+                    <div class="response-area" id="res1"></div>
+                </div>
+            </div>
+
+            <!-- 人脸录制 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>人脸录制</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>设备IP</label>
+                            <input type="text" id="ac2_ip" value="192.168.2.8">
+                        </div>
+                        <div class="form-group">
+                            <label>端口</label>
+                            <input type="number" id="ac2_port" value="8000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>用户名</label>
+                            <input type="text" id="ac2_user" value="admin">
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <input type="password" id="ac2_pass" value="Hik12345">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>门禁名称</label>
+                        <input type="text" id="ac2_name" value="测试门禁">
+                    </div>
+                    <button class="btn btn-primary" onclick="testRecordFace()">录制人脸</button>
+                    <div class="response-area" id="res2"></div>
+                </div>
+            </div>
+
+            <!-- 下发人员 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>下发人员</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="device-section">
+                        <div class="section-title">设备列表</div>
+                        <div id="userDevices"></div>
+                        <button class="add-btn" onclick="addDevice('userDevices')">+ 添加设备</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>工号 (UserID)</label>
+                            <input type="text" id="user_id" value="1001">
+                        </div>
+                        <div class="form-group">
+                            <label>姓名 (UserName)</label>
+                            <input type="text" id="user_name" value="测试用户">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始时间</label>
+                            <input type="text" id="user_start" value="2026-01-01 00:00:00">
+                        </div>
+                        <div class="form-group">
+                            <label>结束时间</label>
+                            <input type="text" id="user_end" value="2026-12-31 23:59:59">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testAddUser()">下发人员</button>
+                    <div class="response-area" id="res3"></div>
+                </div>
+            </div>
+
+            <!-- 查询人员 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>查询人员</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="device-section">
+                        <div class="section-title">设备列表</div>
+                        <div id="queryDevices"></div>
+                        <button class="add-btn" onclick="addDevice('queryDevices')">+ 添加设备</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>工号（可选）</label>
+                            <input type="text" id="query_userid" placeholder="留空查询全部">
+                        </div>
+                        <div class="form-group">
+                            <label>姓名（可选）</label>
+                            <input type="text" id="query_username" placeholder="留空查询全部">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testQueryUsers()">查询人员</button>
+                    <div class="response-area" id="res4"></div>
+                </div>
+            </div>
+
+            <!-- 删除人员 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>删除人员</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="device-section">
+                        <div class="section-title">设备列表</div>
+                        <div id="delDevices"></div>
+                        <button class="add-btn" onclick="addDevice('delDevices')">+ 添加设备</button>
+                    </div>
+                    <div class="form-group">
+                        <label>要删除的工号 (UserID)</label>
+                        <input type="text" id="del_userid" value="1001">
+                    </div>
+                    <button class="btn btn-primary" onclick="testDeleteUser()">删除人员</button>
+                    <div class="response-area" id="res5"></div>
+                </div>
+            </div>
+
+            <!-- 添加卡片 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>添加卡片</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="device-section">
+                        <div class="section-title">设备列表</div>
+                        <div id="cardDevices"></div>
+                        <button class="add-btn" onclick="addDevice('cardDevices')">+ 添加设备</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>工号 (UserID)</label>
+                            <input type="text" id="card_userid" value="1001">
+                        </div>
+                        <div class="form-group">
+                            <label>卡片编号 (CardNo)</label>
+                            <input type="text" id="card_no" value="1234567890">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始时间</label>
+                            <input type="text" id="card_start" value="2026-01-01 00:00:00">
+                        </div>
+                        <div class="form-group">
+                            <label>结束时间</label>
+                            <input type="text" id="card_end" value="2026-12-31 23:59:59">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testAddCard()">添加卡片</button>
+                    <div class="response-area" id="res6"></div>
+                </div>
+            </div>
+
+            <!-- 下发人脸 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>下发人脸</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="device-section">
+                        <div class="section-title">设备列表</div>
+                        <div id="faceDevices"></div>
+                        <button class="add-btn" onclick="addDevice('faceDevices')">+ 添加设备</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>工号 (EmployeeNo)</label>
+                            <input type="text" id="face_empno" value="1001">
+                        </div>
+                        <div class="form-group">
+                            <label>姓名 (Name)</label>
+                            <input type="text" id="face_name" value="测试用户">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>人脸库ID (FDID)</label>
+                            <input type="text" id="face_fdid" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>图片路径</label>
+                            <input type="text" id="face_path" placeholder="RecordFaceImage/face_xxx.jpg">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>或 Base64编码 (FaceImageBase64)</label>
+                        <textarea id="face_base64" rows="3" placeholder="粘贴Base64编码的人脸图片..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="testAddFace()">下发人脸</button>
+                    <div class="response-area" id="res7"></div>
+                </div>
+            </div>
+
+            <!-- 屏幕状态 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>屏幕状态切换</h3>
+                    <span class="method-badge get">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>设备IP（可选）</label>
+                            <input type="text" id="screen_ip" placeholder="留空使用默认配置">
+                        </div>
+                        <div class="form-group">
+                            <label>图片名称 BGP（必填）</label>
+                            <input type="text" id="screen_bgp" value="4" placeholder="4=空闲，5=使用中">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>用户名（可选）</label>
+                            <input type="text" id="screen_user">
+                        </div>
+                        <div class="form-group">
+                            <label>密码（可选）</label>
+                            <input type="password" id="screen_pass">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testScreenStatus()">切换状态</button>
+                    <div class="response-area" id="res8"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化默认设备
+        function initDefaultDevices() {
+            ['userDevices', 'queryDevices', 'delDevices', 'cardDevices', 'faceDevices'].forEach(id => {
+                addDevice(id);
+            });
+        }
+
+        function addDevice(containerId) {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = 'device-item';
+            div.innerHTML = `
+                <div class="device-row">
+                    <div>
+                        <div class="device-label">IP地址</div>
+                        <input type="text" placeholder="IP地址" value="192.168.2.8">
+                    </div>
+                    <div>
+                        <div class="device-label">端口</div>
+                        <input type="number" placeholder="端口" value="8000">
+                    </div>
+                </div>
+                <div class="device-row">
+                    <div>
+                        <div class="device-label">用户名</div>
+                        <input type="text" placeholder="用户名" value="admin">
+                    </div>
+                    <div>
+                        <div class="device-label">密码</div>
+                        <input type="password" placeholder="密码" value="Hik12345">
+                    </div>
+                </div>
+                <div class="device-actions">
+                    <button class="remove-btn" onclick="removeDevice(this)">删除设备</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeDevice(btn) {
+            btn.closest('.device-item').remove();
+        }
+
+        function getDevices(containerId) {
+            const container = document.getElementById(containerId);
+            const items = container.querySelectorAll('.device-item');
+            const devices = [];
+            items.forEach(item => {
+                const inputs = item.querySelectorAll('input');
+                if (inputs[0].value.trim()) {
+                    devices.push({
+                        HikAcIP: inputs[0].value.trim(),
+                        HikAcPort: parseInt(inputs[1].value) || 8000,
+                        HikAcUserName: inputs[2].value.trim(),
+                        HikAcPassword: inputs[3].value,
+                        AcName: '门禁设备'
+                    });
+                }
+            });
+            return devices;
+        }
+
+        async function apiCall(url, method, data, resId) {
+            const resEl = document.getElementById(resId);
+            resEl.textContent = '请求中...';
+            try {
+                const options = { 
+                    method, 
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                const response = await fetch(url, options);
+                const result = await response.json();
+                resEl.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                resEl.textContent = '错误: ' + e.message;
+            }
+        }
+
+        // 门控/梯控
+        function testOpenHikAC() {
+            const data = {
+                HikAcIP: document.getElementById('ac1_ip').value,
+                HikAcPort: parseInt(document.getElementById('ac1_port').value) || 8000,
+                HikAcUserName: document.getElementById('ac1_user').value,
+                HikAcPassword: document.getElementById('ac1_pass').value,
+                AcName: document.getElementById('ac1_name').value,
+                GatewayIndex: parseInt(document.getElementById('ac1_index').value) || 1,
+                Command: parseInt(document.getElementById('ac1_cmd').value)
+            };
+            apiCall('/api/HikAC/openHikAC', 'POST', data, 'res1');
+        }
+
+        // 人脸录制
+        function testRecordFace() {
+            const data = {
+                HikAcIP: document.getElementById('ac2_ip').value,
+                HikAcPort: parseInt(document.getElementById('ac2_port').value) || 8000,
+                HikAcUserName: document.getElementById('ac2_user').value,
+                HikAcPassword: document.getElementById('ac2_pass').value,
+                AcName: document.getElementById('ac2_name').value
+            };
+            apiCall('/api/HikAC/recordFace', 'POST', data, 'res2');
+        }
+
+        // 下发人员
+        function testAddUser() {
+            const devices = getDevices('userDevices');
+            if (devices.length === 0) {
+                document.getElementById('res3').textContent = '请至少添加一个设备';
+                return;
+            }
+            const data = {
+                Devices: devices,
+                UserID: document.getElementById('user_id').value,
+                UserName: document.getElementById('user_name').value,
+                StartTime: document.getElementById('user_start').value || null,
+                EndTime: document.getElementById('user_end').value || null
+            };
+            apiCall('/api/HikAC/addUser', 'POST', data, 'res3');
+        }
+
+        // 查询人员
+        function testQueryUsers() {
+            const devices = getDevices('queryDevices');
+            if (devices.length === 0) {
+                document.getElementById('res4').textContent = '请至少添加一个设备';
+                return;
+            }
+            const data = {
+                Devices: devices,
+                UserID: document.getElementById('query_userid').value || null,
+                UserName: document.getElementById('query_username').value || null
+            };
+            apiCall('/api/HikAC/queryUsers', 'POST', data, 'res4');
+        }
+
+        // 删除人员
+        function testDeleteUser() {
+            const devices = getDevices('delDevices');
+            if (devices.length === 0) {
+                document.getElementById('res5').textContent = '请至少添加一个设备';
+                return;
+            }
+            const data = {
+                Devices: devices,
+                UserID: document.getElementById('del_userid').value
+            };
+            apiCall('/api/HikAC/deleteUser', 'POST', data, 'res5');
+        }
+
+        // 添加卡片
+        function testAddCard() {
+            const devices = getDevices('cardDevices');
+            if (devices.length === 0) {
+                document.getElementById('res6').textContent = '请至少添加一个设备';
+                return;
+            }
+            const data = {
+                Devices: devices,
+                UserID: document.getElementById('card_userid').value,
+                CardNo: document.getElementById('card_no').value,
+                StartTime: document.getElementById('card_start').value || null,
+                EndTime: document.getElementById('card_end').value || null
+            };
+            apiCall('/api/HikAC/addCard', 'POST', data, 'res6');
+        }
+
+        // 下发人脸
+        function testAddFace() {
+            const devices = getDevices('faceDevices');
+            if (devices.length === 0) {
+                document.getElementById('res7').textContent = '请至少添加一个设备';
+                return;
+            }
+            const data = {
+                Devices: devices,
+                EmployeeNo: document.getElementById('face_empno').value,
+                Name: document.getElementById('face_name').value,
+                FDID: document.getElementById('face_fdid').value || '1',
+                FaceImagePath: document.getElementById('face_path').value || null,
+                FaceImageBase64: document.getElementById('face_base64').value || null
+            };
+            apiCall('/api/HikAC/addFace', 'POST', data, 'res7');
+        }
+
+        // 屏幕状态
+        function testScreenStatus() {
+            const params = new URLSearchParams();
+            const ip = document.getElementById('screen_ip').value;
+            const bgp = document.getElementById('screen_bgp').value;
+            const user = document.getElementById('screen_user').value;
+            const pass = document.getElementById('screen_pass').value;
+            
+            if (!bgp) {
+                document.getElementById('res8').textContent = 'BGP不能为空';
+                return;
+            }
+            
+            if (ip) params.append('IP', ip);
+            params.append('BGP', bgp);
+            if (user) params.append('UserName', user);
+            if (pass) params.append('Password', pass);
+            
+            apiCall('/api/HikAC/ScreenStatus?' + params.toString(), 'GET', null, 'res8');
+        }
+
+        // 页面加载时初始化
+        initDefaultDevices();
+    </script>
+</body>
+</html>

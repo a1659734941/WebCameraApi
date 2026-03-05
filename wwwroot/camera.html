@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄像头RTSP - WebCamera API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        .header h1 { font-size: 1.8em; }
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .api-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .api-header {
+            padding: 15px 20px;
+            background: rgba(79,172,254,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .api-header h3 { font-size: 1.1em; }
+        .method-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .post { background: #49cc90; }
+        .get { background: #61affe; }
+        .api-body { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .camera-list {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .camera-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .camera-item input { padding: 8px; font-size: 0.85em; }
+        .remove-btn {
+            padding: 8px 12px;
+            background: #dc3545;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-btn {
+            padding: 8px 15px;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .rtsp-display {
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        .rtsp-display code {
+            color: #4facfe;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 返回</a>
+            <h1>📹 摄像头RTSP接口测试</h1>
+        </div>
+        
+        <div class="api-grid">
+            <!-- 查询RTSP地址 GET -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>查询RTSP地址 (GET)</h3>
+                    <span class="method-badge get">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>摄像头名称</label>
+                        <input type="text" id="rtsp_name_get" placeholder="输入摄像头名称">
+                    </div>
+                    <button class="btn btn-primary" onclick="testGetRtspGet()">查询RTSP</button>
+                    <div class="response-area" id="res1"></div>
+                </div>
+            </div>
+
+            <!-- 查询RTSP地址 POST -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>查询RTSP地址 (POST)</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>摄像头名称</label>
+                        <input type="text" id="rtsp_name_post" placeholder="输入摄像头名称">
+                    </div>
+                    <button class="btn btn-primary" onclick="testGetRtspPost()">查询RTSP</button>
+                    <div class="response-area" id="res2"></div>
+                </div>
+            </div>
+
+            <!-- 批量添加摄像头配置 -->
+            <div class="api-card" style="grid-column: span 2;">
+                <div class="api-header">
+                    <h3>批量添加摄像头配置</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="camera-list" id="cameraList">
+                        <div class="camera-item">
+                            <input type="text" placeholder="摄像头名称" value="摄像头1">
+                            <input type="text" placeholder="IP地址" value="192.168.1.100">
+                            <input type="text" placeholder="用户名" value="admin">
+                            <input type="password" placeholder="密码" value="admin123">
+                            <input type="number" placeholder="端口" value="80">
+                            <button class="remove-btn" onclick="removeCamera(this)">删除</button>
+                        </div>
+                    </div>
+                    <button class="add-btn" onclick="addCamera()">+ 添加摄像头</button>
+                    
+                    <div class="form-row" style="margin-top:15px;">
+                        <div class="form-group">
+                            <label>重试次数（可选，默认3）</label>
+                            <input type="number" id="camera_retry" value="3" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>等待毫秒数（可选，默认5000）</label>
+                            <input type="number" id="camera_wait" value="5000" min="0">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testBatchAdd()">批量导入配置</button>
+                    <div class="response-area" id="res3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function addCamera() {
+            const container = document.getElementById('cameraList');
+            const div = document.createElement('div');
+            div.className = 'camera-item';
+            div.innerHTML = `
+                <input type="text" placeholder="摄像头名称" value="">
+                <input type="text" placeholder="IP地址" value="">
+                <input type="text" placeholder="用户名" value="admin">
+                <input type="password" placeholder="密码" value="">
+                <input type="number" placeholder="端口" value="80">
+                <button class="remove-btn" onclick="removeCamera(this)">删除</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeCamera(btn) {
+            btn.parentElement.remove();
+        }
+
+        function getCameraList() {
+            const container = document.getElementById('cameraList');
+            const items = container.querySelectorAll('.camera-item');
+            const cameras = [];
+            const retry = parseInt(document.getElementById('camera_retry').value) || 3;
+            const wait = parseInt(document.getElementById('camera_wait').value) || 5000;
+            
+            items.forEach(item => {
+                const inputs = item.querySelectorAll('input');
+                const name = inputs[0].value.trim();
+                const ip = inputs[1].value.trim();
+                const user = inputs[2].value.trim();
+                const pass = inputs[3].value;
+                const port = parseInt(inputs[4].value) || 80;
+                
+                if (name && ip && user && pass) {
+                    cameras.push({
+                        cameraName: name,
+                        cameraIP: ip,
+                        cameraUser: user,
+                        cameraPassword: pass,
+                        cameraPort: port,
+                        cameraRetryCount: retry,
+                        cameraWaitmillisecounds: wait
+                    });
+                }
+            });
+            return cameras;
+        }
+
+        async function apiCall(url, method, data, resId) {
+            const resEl = document.getElementById(resId);
+            resEl.textContent = '请求中...';
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (data) options.body = JSON.stringify(data);
+                const response = await fetch(url, options);
+                const result = await response.json();
+                resEl.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                resEl.textContent = '错误: ' + e.message;
+            }
+        }
+
+        function testGetRtspGet() {
+            const name = document.getElementById('rtsp_name_get').value;
+            if (!name) {
+                document.getElementById('res1').textContent = '请输入摄像头名称';
+                return;
+            }
+            apiCall('/api/CameraRtsp/GetRtsp?cameraName=' + encodeURIComponent(name), 'GET', null, 'res1');
+        }
+
+        function testGetRtspPost() {
+            const name = document.getElementById('rtsp_name_post').value;
+            if (!name) {
+                document.getElementById('res2').textContent = '请输入摄像头名称';
+                return;
+            }
+            apiCall('/api/CameraRtsp/GetRtsp', 'POST', name, 'res2');
+        }
+
+        function testBatchAdd() {
+            const cameras = getCameraList();
+            if (cameras.length === 0) {
+                document.getElementById('res3').textContent = '请至少添加一个有效的摄像头配置';
+                return;
+            }
+            apiCall('/api/CameraRtsp/BatchAddConfig', 'POST', cameras, 'res3');
+        }
+    </script>
+</body>
+</html>

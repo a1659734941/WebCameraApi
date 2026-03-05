@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebCamera API 测试平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header p {
+            color: #aaa;
+            font-size: 1.1em;
+        }
+        .modules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+        .module-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.2);
+        }
+        .module-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        .module-card:nth-child(1) .module-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .module-card:nth-child(2) .module-icon { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .module-card:nth-child(3) .module-icon { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .module-card:nth-child(4) .module-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .module-card:nth-child(5) .module-icon { background: linear-gradient(135deg, #fa709a, #fee140); }
+        .module-card h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+        .module-card p {
+            color: #888;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        .module-card .api-count {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 5px 12px;
+            background: rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #00d4ff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .swagger-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(90deg, #7b2cbf, #00d4ff);
+            border-radius: 25px;
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .swagger-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(123, 44, 191, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WebCamera API 测试平台</h1>
+            <p>摄像头、门禁与海康报警接口测试工具</p>
+            <a href="/swagger" class="swagger-link">Swagger API 文档</a>
+        </div>
+        
+        <div class="modules">
+            <a href="hikac.html" class="module-card">
+                <div class="module-icon">🔐</div>
+                <h3>海康门禁控制</h3>
+                <p>门控/梯控、人脸录制、人员管理、卡片管理、人脸下发等接口测试</p>
+                <span class="api-count">8 个接口</span>
+            </a>
+            
+            <a href="hikalarm.html" class="module-card">
+                <div class="module-icon">🚨</div>
+                <h3>海康报警接口</h3>
+                <p>人数计数、行为分析、报警记录查询、统计等接口测试</p>
+                <span class="api-count">5 个接口</span>
+            </a>
+            
+            <a href="camera.html" class="module-card">
+                <div class="module-icon">📹</div>
+                <h3>摄像头RTSP</h3>
+                <p>RTSP地址查询、摄像头配置批量导入等接口测试</p>
+                <span class="api-count">3 个接口</span>
+            </a>
+            
+            <a href="cabinet.html" class="module-card">
+                <div class="module-icon">🗄️</div>
+                <h3>智能柜控制</h3>
+                <p>志信锁控板单开、全开、单查等接口测试</p>
+                <span class="api-count">1 个接口</span>
+            </a>
+            
+            <a href="bananqu.html" class="module-card">
+                <div class="module-icon">📋</div>
+                <h3>办案区数据上报</h3>
+                <p>东海/广南办案区入区出区人员信息上报接口测试</p>
+                <span class="api-count">6 个接口</span>
+            </a>
+        </div>
+        
+        <div class="footer">
+            <p>WebCamera API v1.0 | 基于 ASP.NET Core 8.0</p>
+        </div>
+    </div>
+</body>
+</html>

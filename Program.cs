@@ -163,6 +163,9 @@ namespace WebCameraApi
             // 启用Swagger UI中间件，提供可视化的API调试界面（默认路径：/swagger）
             app.UseSwaggerUI();
 
+            // 启用静态文件服务，提供wwwroot目录下的HTML测试页面
+            app.UseStaticFiles();
+
             // 应用CORS中间件，使用名为"AllowAll"的跨域策略
             // 注意：CORS中间件必须在UseRouting和UseAuthorization之前
             app.UseCors("AllowAll");
@@ -178,6 +181,12 @@ namespace WebCameraApi
 
             // 映射控制器路由，将请求路由到对应的控制器和动作方法
             app.MapControllers();
+
+            // 配置默认路由：访问根路径时跳转到index.html
+            app.MapGet("/", async context =>
+            {
+                context.Response.Redirect("/index.html");
+            });
             #endregion
 
             // 启动Web应用程序，开始监听HTTP请求

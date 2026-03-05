@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能柜控制 - WebCamera API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        .header h1 { font-size: 1.8em; }
+        .api-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .api-header {
+            padding: 15px 20px;
+            background: rgba(67,233,123,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .api-header h3 { font-size: 1.1em; }
+        .method-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            background: #49cc90;
+        }
+        .api-body { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #43e97b;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #43e97b, #38f9d7);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .quick-btn {
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .quick-btn:hover {
+            background: rgba(67,233,123,0.2);
+            border-color: #43e97b;
+        }
+        .quick-btn.active {
+            background: rgba(67,233,123,0.3);
+            border-color: #43e97b;
+        }
+        .info-box {
+            background: rgba(67,233,123,0.1);
+            border-left: 3px solid #43e97b;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 6px 6px 0;
+        }
+        .info-box h4 {
+            color: #43e97b;
+            margin-bottom: 10px;
+        }
+        .info-box ul {
+            list-style: none;
+            color: #aaa;
+        }
+        .info-box li {
+            padding: 3px 0;
+        }
+        .info-box li::before {
+            content: '• ';
+            color: #43e97b;
+        }
+        .door-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .door-btn {
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .door-btn:hover {
+            background: rgba(67,233,123,0.2);
+            border-color: #43e97b;
+        }
+        .door-btn span {
+            display: block;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .door-btn small {
+            color: #888;
+            font-size: 0.75em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 返回</a>
+            <h1>🗄️ 智能柜控制接口测试</h1>
+        </div>
+        
+        <div class="info-box">
+            <h4>志信锁控板接口说明</h4>
+            <ul>
+                <li><strong>动作类型：</strong>单开、全开、单查</li>
+                <li><strong>地址：</strong>默认从 0 开始</li>
+                <li><strong>门号：</strong>默认从 1 开始</li>
+                <li><strong>IP格式：</strong>IP:端口（如：192.168.1.100:8899）</li>
+            </ul>
+        </div>
+
+        <div class="api-card">
+            <div class="api-header">
+                <h3>志信锁控板控制</h3>
+                <span class="method-badge">POST</span>
+            </div>
+            <div class="api-body">
+                <div class="form-group">
+                    <label>设备地址 (IP:端口)</label>
+                    <input type="text" id="cabinet_ip" value="192.168.1.100:8899" placeholder="192.168.1.100:8899">
+                </div>
+                
+                <div class="quick-actions">
+                    <button class="quick-btn active" onclick="setAction('单开')">单开</button>
+                    <button class="quick-btn" onclick="setAction('全开')">全开</button>
+                    <button class="quick-btn" onclick="setAction('单查')">单查</button>
+                </div>
+                
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>动作</label>
+                        <select id="cabinet_action">
+                            <option value="单开">单开</option>
+                            <option value="全开">全开</option>
+                            <option value="单查">单查</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>地址（默认0）</label>
+                        <input type="number" id="cabinet_addr" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>门号（默认1）</label>
+                        <input type="number" id="cabinet_door" value="1" min="1">
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="testZhiXin()">执行操作</button>
+                <button class="btn btn-secondary" onclick="testQueryAll()">查询所有门状态</button>
+                
+                <div class="response-area" id="res1"></div>
+            </div>
+        </div>
+
+        <div class="api-card">
+            <div class="api-header">
+                <h3>快速开门</h3>
+                <span class="method-badge">POST</span>
+            </div>
+            <div class="api-body">
+                <p style="color:#aaa;margin-bottom:15px;">点击下方门按钮快速打开指定门</p>
+                
+                <div class="form-group">
+                    <label>设备地址 (IP:端口)</label>
+                    <input type="text" id="quick_ip" value="192.168.1.100:8899">
+                </div>
+                
+                <div class="door-grid" id="doorGrid">
+                </div>
+                
+                <div class="response-area" id="res2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function initDoorGrid() {
+            const grid = document.getElementById('doorGrid');
+            for (let i = 1; i <= 12; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'door-btn';
+                btn.innerHTML = `<span>${i}</span><small>门</small>`;
+                btn.onclick = () => quickOpenDoor(i);
+                grid.appendChild(btn);
+            }
+        }
+
+        function setAction(action) {
+            document.getElementById('cabinet_action').value = action;
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === action) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        async function apiCall(url, method, data, resId) {
+            const resEl = document.getElementById(resId);
+            resEl.textContent = '请求中...';
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (data) options.body = JSON.stringify(data);
+                const response = await fetch(url, options);
+                const result = await response.json();
+                resEl.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                resEl.textContent = '错误: ' + e.message;
+            }
+        }
+
+        function testZhiXin() {
+            const data = {
+                IP: document.getElementById('cabinet_ip').value,
+                Action: document.getElementById('cabinet_action').value,
+                Address: parseInt(document.getElementById('cabinet_addr').value) || 0,
+                Door: parseInt(document.getElementById('cabinet_door').value) || 1
+            };
+            apiCall('/api/SmartCabinet/ZhiXin', 'POST', data, 'res1');
+        }
+
+        function testQueryAll() {
+            const ip = document.getElementById('cabinet_ip').value;
+            document.getElementById('res1').textContent = '逐个查询中...';
+            
+            let results = [];
+            let promises = [];
+            
+            for (let i = 1; i <= 12; i++) {
+                const data = {
+                    IP: ip,
+                    Action: '单查',
+                    Address: 0,
+                    Door: i
+                };
+                promises.push(
+                    fetch('/api/SmartCabinet/ZhiXin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    }).then(r => r.json()).then(res => {
+                        results.push({ door: i, result: res });
+                    })
+                );
+            }
+            
+            Promise.all(promises).then(() => {
+                results.sort((a, b) => a.door - b.door);
+                document.getElementById('res1').textContent = JSON.stringify(results, null, 2);
+            });
+        }
+
+        function quickOpenDoor(doorNo) {
+            const data = {
+                IP: document.getElementById('quick_ip').value,
+                Action: '单开',
+                Address: 0,
+                Door: doorNo
+            };
+            apiCall('/api/SmartCabinet/ZhiXin', 'POST', data, 'res2');
+        }
+
+        initDoorGrid();
+    </script>
+</body>
+</html>

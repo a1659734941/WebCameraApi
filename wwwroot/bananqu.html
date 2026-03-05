@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>办案区上传 - WebCamera API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        .header h1 { font-size: 1.8em; }
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 20px;
+        }
+        .api-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .api-header {
+            padding: 15px 20px;
+            background: rgba(102,126,234,0.15);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .api-header h3 { font-size: 1.1em; }
+        .method-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .post { background: #49cc90; }
+        .api-body { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .section-title {
+            color: #667eea;
+            font-size: 0.95em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(102,126,234,0.3);
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 5px;
+        }
+        .tab {
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #aaa;
+        }
+        .tab.active {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .tab:hover:not(.active) {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+        .data-table th, .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .data-table th {
+            background: rgba(102,126,234,0.2);
+            color: #667eea;
+        }
+        .data-table tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .pagination input {
+            width: 60px;
+            text-align: center;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            color: #fff;
+        }
+        .total-info {
+            color: #888;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 返回</a>
+            <h1>📋 办案区数据上报接口测试</h1>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dh')">东海办案区</div>
+            <div class="tab" onclick="switchTab('gn')">广南办案区</div>
+            <div class="tab" onclick="switchTab('test')">测试接口</div>
+        </div>
+
+        <!-- 东海办案区 -->
+        <div id="dh-tab" class="tab-content active">
+            <div class="api-grid">
+                <!-- 查询列表 -->
+                <div class="api-card" style="grid-column: span 2;">
+                    <div class="api-header">
+                        <h3>东海 - 查询入区出区人员列表</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>姓名（模糊查询）</label>
+                                <input type="text" id="dh_query_xm" placeholder="留空查询全部">
+                            </div>
+                            <div class="form-group">
+                                <label>信息主键编号</label>
+                                <input type="text" id="dh_query_xxzjbh" placeholder="留空查询全部">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>入区人员信息主键编号</label>
+                                <input type="text" id="dh_query_rqry_xxzjbh" placeholder="留空查询全部">
+                            </div>
+                            <div class="form-group">
+                                <label>案件编号</label>
+                                <input type="text" id="dh_query_ajbh" placeholder="留空查询全部">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>页码</label>
+                                <input type="number" id="dh_query_pagenum" value="1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>每页数量</label>
+                                <input type="number" id="dh_query_pagesize" value="10" min="1" max="100">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="dhQueryList()">查询</button>
+                        <div class="response-area" id="dh_list_res"></div>
+                    </div>
+                </div>
+
+                <!-- 新增/更新 -->
+                <div class="api-card" style="grid-column: span 2;">
+                    <div class="api-header">
+                        <h3>东海 - 新增/更新入区出区人员</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <div class="section-title">基本信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>信息主键编号 *</label>
+                                <input type="text" id="dh_xxzjbh" placeholder="必填">
+                            </div>
+                            <div class="form-group">
+                                <label>入区人员信息主键编号</label>
+                                <input type="text" id="dh_rqry_xxzjbh">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>姓名</label>
+                                <input type="text" id="dh_rqry_xm">
+                            </div>
+                            <div class="form-group">
+                                <label>证件号码</label>
+                                <input type="text" id="dh_zjhm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>性别代码</label>
+                                <select id="dh_xbdm">
+                                    <option value="">请选择</option>
+                                    <option value="1">男</option>
+                                    <option value="2">女</option>
+                                    <option value="9">未知</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>人员属性代码</label>
+                                <input type="text" id="dh_rysxdm" placeholder="如：1-嫌疑人">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>案件编号</label>
+                                <input type="text" id="dh_ajbh">
+                            </div>
+                            <div class="form-group">
+                                <label>入区原因</label>
+                                <input type="text" id="dh_rqyy">
+                            </div>
+                        </div>
+                        
+                        <div class="section-title">时间信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>入区时间</label>
+                                <input type="datetime-local" id="dh_rqsj">
+                            </div>
+                            <div class="form-group">
+                                <label>出区时间</label>
+                                <input type="datetime-local" id="dh_cqsj">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>出区类型代码</label>
+                                <input type="text" id="dh_cqlxdm" placeholder="如：1-正常出区">
+                            </div>
+                            <div class="form-group">
+                                <label>数据上传时间</label>
+                                <input type="datetime-local" id="dh_sjscsj">
+                            </div>
+                        </div>
+
+                        <div class="section-title">办案区信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>办案区行政区划代码</label>
+                                <input type="text" id="dh_baq_xzqhdm">
+                            </div>
+                            <div class="form-group">
+                                <label>办案区编号</label>
+                                <input type="text" id="dh_baqbh">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>办案区名称</label>
+                                <input type="text" id="dh_baq_mc">
+                            </div>
+                            <div class="form-group">
+                                <label>全流程视频访问地址</label>
+                                <input type="text" id="dh_fwdz">
+                            </div>
+                        </div>
+
+                        <div class="section-title">带入民警信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带入民警公民身份号码</label>
+                                <input type="text" id="dh_drmj_gmsfhm">
+                            </div>
+                            <div class="form-group">
+                                <label>带入民警姓名</label>
+                                <input type="text" id="dh_drmj_xm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带入民警联系电话</label>
+                                <input type="text" id="dh_drmj_lxdh">
+                            </div>
+                            <div class="form-group">
+                                <label>带入民警公安机关机构代码</label>
+                                <input type="text" id="dh_drmj_gajgjgdm">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>带入民警单位名称</label>
+                            <input type="text" id="dh_drmj_dwmc">
+                        </div>
+
+                        <div class="section-title">带出民警信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带出民警公民身份号码</label>
+                                <input type="text" id="dh_dcmj_gmsfhm">
+                            </div>
+                            <div class="form-group">
+                                <label>带出民警姓名</label>
+                                <input type="text" id="dh_dcmj_xm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带出民警联系电话</label>
+                                <input type="text" id="dh_dcmj_lxdh">
+                            </div>
+                            <div class="form-group">
+                                <label>带出民警公安机关机构代码</label>
+                                <input type="text" id="dh_dcmj_gajgjgdm">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>带出民警单位名称</label>
+                            <input type="text" id="dh_dcmj_dwmc">
+                        </div>
+
+                        <div class="form-group">
+                            <label>登记(变更)标识</label>
+                            <input type="text" id="dh_djbgbs" placeholder="如：1-登记 2-变更">
+                        </div>
+
+                        <button class="btn btn-primary" onclick="dhUpsert()">提交</button>
+                        <button class="btn btn-secondary" onclick="dhClearForm()">清空表单</button>
+                        <div class="response-area" id="dh_upsert_res"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 广南办案区 -->
+        <div id="gn-tab" class="tab-content">
+            <div class="api-grid">
+                <!-- 查询列表 -->
+                <div class="api-card" style="grid-column: span 2;">
+                    <div class="api-header">
+                        <h3>广南 - 查询入区出区人员列表</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>姓名（模糊查询）</label>
+                                <input type="text" id="gn_query_xm" placeholder="留空查询全部">
+                            </div>
+                            <div class="form-group">
+                                <label>信息主键编号</label>
+                                <input type="text" id="gn_query_xxzjbh" placeholder="留空查询全部">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>入区人员信息主键编号</label>
+                                <input type="text" id="gn_query_rqry_xxzjbh" placeholder="留空查询全部">
+                            </div>
+                            <div class="form-group">
+                                <label>案件编号</label>
+                                <input type="text" id="gn_query_ajbh" placeholder="留空查询全部">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>页码</label>
+                                <input type="number" id="gn_query_pagenum" value="1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>每页数量</label>
+                                <input type="number" id="gn_query_pagesize" value="10" min="1" max="100">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="gnQueryList()">查询</button>
+                        <div class="response-area" id="gn_list_res"></div>
+                    </div>
+                </div>
+
+                <!-- 新增/更新 -->
+                <div class="api-card" style="grid-column: span 2;">
+                    <div class="api-header">
+                        <h3>广南 - 新增/更新入区出区人员</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <div class="section-title">基本信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>信息主键编号 *</label>
+                                <input type="text" id="gn_xxzjbh" placeholder="必填">
+                            </div>
+                            <div class="form-group">
+                                <label>入区人员信息主键编号</label>
+                                <input type="text" id="gn_rqry_xxzjbh">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>姓名</label>
+                                <input type="text" id="gn_rqry_xm">
+                            </div>
+                            <div class="form-group">
+                                <label>证件号码</label>
+                                <input type="text" id="gn_zjhm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>性别代码</label>
+                                <select id="gn_xbdm">
+                                    <option value="">请选择</option>
+                                    <option value="1">男</option>
+                                    <option value="2">女</option>
+                                    <option value="9">未知</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>人员属性代码</label>
+                                <input type="text" id="gn_rysxdm" placeholder="如：1-嫌疑人">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>案件编号</label>
+                                <input type="text" id="gn_ajbh">
+                            </div>
+                            <div class="form-group">
+                                <label>入区原因</label>
+                                <input type="text" id="gn_rqyy">
+                            </div>
+                        </div>
+                        
+                        <div class="section-title">时间信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>入区时间</label>
+                                <input type="datetime-local" id="gn_rqsj">
+                            </div>
+                            <div class="form-group">
+                                <label>出区时间</label>
+                                <input type="datetime-local" id="gn_cqsj">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>出区类型代码</label>
+                                <input type="text" id="gn_cqlxdm" placeholder="如：1-正常出区">
+                            </div>
+                            <div class="form-group">
+                                <label>数据上传时间</label>
+                                <input type="datetime-local" id="gn_sjscsj">
+                            </div>
+                        </div>
+
+                        <div class="section-title">办案区信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>办案区行政区划代码</label>
+                                <input type="text" id="gn_baq_xzqhdm">
+                            </div>
+                            <div class="form-group">
+                                <label>办案区编号</label>
+                                <input type="text" id="gn_baqbh">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>办案区名称</label>
+                                <input type="text" id="gn_baq_mc">
+                            </div>
+                            <div class="form-group">
+                                <label>全流程视频访问地址</label>
+                                <input type="text" id="gn_fwdz">
+                            </div>
+                        </div>
+
+                        <div class="section-title">带入民警信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带入民警公民身份号码</label>
+                                <input type="text" id="gn_drmj_gmsfhm">
+                            </div>
+                            <div class="form-group">
+                                <label>带入民警姓名</label>
+                                <input type="text" id="gn_drmj_xm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带入民警联系电话</label>
+                                <input type="text" id="gn_drmj_lxdh">
+                            </div>
+                            <div class="form-group">
+                                <label>带入民警公安机关机构代码</label>
+                                <input type="text" id="gn_drmj_gajgjgdm">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>带入民警单位名称</label>
+                            <input type="text" id="gn_drmj_dwmc">
+                        </div>
+
+                        <div class="section-title">带出民警信息</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带出民警公民身份号码</label>
+                                <input type="text" id="gn_dcmj_gmsfhm">
+                            </div>
+                            <div class="form-group">
+                                <label>带出民警姓名</label>
+                                <input type="text" id="gn_dcmj_xm">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>带出民警联系电话</label>
+                                <input type="text" id="gn_dcmj_lxdh">
+                            </div>
+                            <div class="form-group">
+                                <label>带出民警公安机关机构代码</label>
+                                <input type="text" id="gn_dcmj_gajgjgdm">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>带出民警单位名称</label>
+                            <input type="text" id="gn_dcmj_dwmc">
+                        </div>
+
+                        <div class="form-group">
+                            <label>登记(变更)标识</label>
+                            <input type="text" id="gn_djbgbs" placeholder="如：1-登记 2-变更">
+                        </div>
+
+                        <button class="btn btn-primary" onclick="gnUpsert()">提交</button>
+                        <button class="btn btn-secondary" onclick="gnClearForm()">清空表单</button>
+                        <div class="response-area" id="gn_upsert_res"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 测试接口 -->
+        <div id="test-tab" class="tab-content">
+            <div class="api-grid">
+                <div class="api-card">
+                    <div class="api-header">
+                        <h3>测试 - 查询列表</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <button class="btn btn-primary" onclick="testList()">查询</button>
+                        <div class="response-area" id="test_list_res"></div>
+                    </div>
+                </div>
+
+                <div class="api-card">
+                    <div class="api-header">
+                        <h3>测试 - 新增/更新</h3>
+                        <span class="method-badge post">POST</span>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>ID *</label>
+                                <input type="text" id="test_id" placeholder="必填">
+                            </div>
+                            <div class="form-group">
+                                <label>TYPE</label>
+                                <input type="text" id="test_type">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="testUpsert()">提交</button>
+                        <div class="response-area" id="test_upsert_res"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        async function apiCall(url, method, data, resId) {
+            const resEl = document.getElementById(resId);
+            resEl.textContent = '请求中...';
+            try {
+                const options = { 
+                    method, 
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (data) options.body = JSON.stringify(data);
+                const response = await fetch(url, options);
+                const result = await response.json();
+                resEl.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                resEl.textContent = '错误: ' + e.message;
+            }
+        }
+
+        function getDateTimeValue(id) {
+            const el = document.getElementById(id);
+            return el.value ? new Date(el.value).toISOString() : null;
+        }
+
+        // 东海查询
+        function dhQueryList() {
+            const data = {
+                RQRY_XM: document.getElementById('dh_query_xm').value || null,
+                XXZJBH: document.getElementById('dh_query_xxzjbh').value || null,
+                RQRY_XXZJBH: document.getElementById('dh_query_rqry_xxzjbh').value || null,
+                AJBH: document.getElementById('dh_query_ajbh').value || null,
+                PageNum: parseInt(document.getElementById('dh_query_pagenum').value) || 1,
+                PageSize: parseInt(document.getElementById('dh_query_pagesize').value) || 10
+            };
+            apiCall('/api/BanAnQu/DH/List', 'POST', data, 'dh_list_res');
+        }
+
+        // 东海新增/更新
+        function dhUpsert() {
+            const data = {
+                XXZJBH: document.getElementById('dh_xxzjbh').value,
+                RQRY_XXZJBH: document.getElementById('dh_rqry_xxzjbh').value || null,
+                RQRY_XM: document.getElementById('dh_rqry_xm').value || null,
+                ZJHM: document.getElementById('dh_zjhm').value || null,
+                XBDM: document.getElementById('dh_xbdm').value || null,
+                RYSXDM: document.getElementById('dh_rysxdm').value || null,
+                AJBH: document.getElementById('dh_ajbh').value || null,
+                RQSJ: getDateTimeValue('dh_rqsj'),
+                CQSJ: getDateTimeValue('dh_cqsj'),
+                CQLXDM: document.getElementById('dh_cqlxdm').value || null,
+                FWDZ: document.getElementById('dh_fwdz').value || null,
+                BAQ_XZQHDM: document.getElementById('dh_baq_xzqhdm').value || null,
+                BAQBH: document.getElementById('dh_baqbh').value || null,
+                BAQ_MC: document.getElementById('dh_baq_mc').value || null,
+                DRMJ_GMSFHM: document.getElementById('dh_drmj_gmsfhm').value || null,
+                DRMJ_XM: document.getElementById('dh_drmj_xm').value || null,
+                DRMJ_LXDH: document.getElementById('dh_drmj_lxdh').value || null,
+                DRMJ_GAJGJGDM: document.getElementById('dh_drmj_gajgjgdm').value || null,
+                DRMJ_DWMC: document.getElementById('dh_drmj_dwmc').value || null,
+                DCMJ_GMSFHM: document.getElementById('dh_dcmj_gmsfhm').value || null,
+                DCMJ_XM: document.getElementById('dh_dcmj_xm').value || null,
+                DCMJ_LXDH: document.getElementById('dh_dcmj_lxdh').value || null,
+                DCMJ_GAJGJGDM: document.getElementById('dh_dcmj_gajgjgdm').value || null,
+                DCMJ_DWMC: document.getElementById('dh_dcmj_dwmc').value || null,
+                DJBGBS: document.getElementById('dh_djbgbs').value || null,
+                SJSCSJ: getDateTimeValue('dh_sjscsj'),
+                RQYY: document.getElementById('dh_rqyy').value || null
+            };
+            apiCall('/api/BanAnQu/DH/Upsert', 'POST', data, 'dh_upsert_res');
+        }
+
+        function dhClearForm() {
+            ['dh_xxzjbh', 'dh_rqry_xxzjbh', 'dh_rqry_xm', 'dh_zjhm', 'dh_xbdm', 'dh_rysxdm', 
+             'dh_ajbh', 'dh_rqsj', 'dh_cqsj', 'dh_cqlxdm', 'dh_fwdz', 'dh_baq_xzqhdm', 
+             'dh_baqbh', 'dh_baq_mc', 'dh_drmj_gmsfhm', 'dh_drmj_xm', 'dh_drmj_lxdh', 
+             'dh_drmj_gajgjgdm', 'dh_drmj_dwmc', 'dh_dcmj_gmsfhm', 'dh_dcmj_xm', 
+             'dh_dcmj_lxdh', 'dh_dcmj_gajgjgdm', 'dh_dcmj_dwmc', 'dh_djbgbs', 'dh_sjscsj', 'dh_rqyy']
+            .forEach(id => document.getElementById(id).value = '');
+        }
+
+        // 广南查询
+        function gnQueryList() {
+            const data = {
+                RQRY_XM: document.getElementById('gn_query_xm').value || null,
+                XXZJBH: document.getElementById('gn_query_xxzjbh').value || null,
+                RQRY_XXZJBH: document.getElementById('gn_query_rqry_xxzjbh').value || null,
+                AJBH: document.getElementById('gn_query_ajbh').value || null,
+                PageNum: parseInt(document.getElementById('gn_query_pagenum').value) || 1,
+                PageSize: parseInt(document.getElementById('gn_query_pagesize').value) || 10
+            };
+            apiCall('/api/BanAnQu/GN/List', 'POST', data, 'gn_list_res');
+        }
+
+        // 广南新增/更新
+        function gnUpsert() {
+            const data = {
+                XXZJBH: document.getElementById('gn_xxzjbh').value,
+                RQRY_XXZJBH: document.getElementById('gn_rqry_xxzjbh').value || null,
+                RQRY_XM: document.getElementById('gn_rqry_xm').value || null,
+                ZJHM: document.getElementById('gn_zjhm').value || null,
+                XBDM: document.getElementById('gn_xbdm').value || null,
+                RYSXDM: document.getElementById('gn_rysxdm').value || null,
+                AJBH: document.getElementById('gn_ajbh').value || null,
+                RQSJ: getDateTimeValue('gn_rqsj'),
+                CQSJ: getDateTimeValue('gn_cqsj'),
+                CQLXDM: document.getElementById('gn_cqlxdm').value || null,
+                FWDZ: document.getElementById('gn_fwdz').value || null,
+                BAQ_XZQHDM: document.getElementById('gn_baq_xzqhdm').value || null,
+                BAQBH: document.getElementById('gn_baqbh').value || null,
+                BAQ_MC: document.getElementById('gn_baq_mc').value || null,
+                DRMJ_GMSFHM: document.getElementById('gn_drmj_gmsfhm').value || null,
+                DRMJ_XM: document.getElementById('gn_drmj_xm').value || null,
+                DRMJ_LXDH: document.getElementById('gn_drmj_lxdh').value || null,
+                DRMJ_GAJGJGDM: document.getElementById('gn_drmj_gajgjgdm').value || null,
+                DRMJ_DWMC: document.getElementById('gn_drmj_dwmc').value || null,
+                DCMJ_GMSFHM: document.getElementById('gn_dcmj_gmsfhm').value || null,
+                DCMJ_XM: document.getElementById('gn_dcmj_xm').value || null,
+                DCMJ_LXDH: document.getElementById('gn_dcmj_lxdh').value || null,
+                DCMJ_GAJGJGDM: document.getElementById('gn_dcmj_gajgjgdm').value || null,
+                DCMJ_DWMC: document.getElementById('gn_dcmj_dwmc').value || null,
+                DJBGBS: document.getElementById('gn_djbgbs').value || null,
+                SJSCSJ: getDateTimeValue('gn_sjscsj'),
+                RQYY: document.getElementById('gn_rqyy').value || null
+            };
+            apiCall('/api/BanAnQu/GN/Upsert', 'POST', data, 'gn_upsert_res');
+        }
+
+        function gnClearForm() {
+            ['gn_xxzjbh', 'gn_rqry_xxzjbh', 'gn_rqry_xm', 'gn_zjhm', 'gn_xbdm', 'gn_rysxdm', 
+             'gn_ajbh', 'gn_rqsj', 'gn_cqsj', 'gn_cqlxdm', 'gn_fwdz', 'gn_baq_xzqhdm', 
+             'gn_baqbh', 'gn_baq_mc', 'gn_drmj_gmsfhm', 'gn_drmj_xm', 'gn_drmj_lxdh', 
+             'gn_drmj_gajgjgdm', 'gn_drmj_dwmc', 'gn_dcmj_gmsfhm', 'gn_dcmj_xm', 
+             'gn_dcmj_lxdh', 'gn_dcmj_gajgjgdm', 'gn_dcmj_dwmc', 'gn_djbgbs', 'gn_sjscsj', 'gn_rqyy']
+            .forEach(id => document.getElementById(id).value = '');
+        }
+
+        // 测试接口
+        function testList() {
+            apiCall('/api/BanAnQu/Test/List', 'POST', null, 'test_list_res');
+        }
+
+        function testUpsert() {
+            const data = {
+                ID: document.getElementById('test_id').value,
+                TYPE: document.getElementById('test_type').value || null
+            };
+            apiCall('/api/BanAnQu/Test/Upsert', 'POST', data, 'test_upsert_res');
+        }
+    </script>
+</body>
+</html>

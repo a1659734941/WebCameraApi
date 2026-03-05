@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海康报警接口 - WebCamera API</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            margin-right: 20px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        .header h1 { font-size: 1.8em; }
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .api-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        .api-header {
+            padding: 15px 20px;
+            background: rgba(240,147,251,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .api-header h3 { font-size: 1.1em; }
+        .method-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .post { background: #49cc90; }
+        .get { background: #61affe; }
+        .api-body { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #f093fb;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #f093fb, #f5576c);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .note {
+            background: rgba(255,193,7,0.1);
+            border-left: 3px solid #ffc107;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #ffc107;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .stat-card h4 {
+            color: #f093fb;
+            margin-bottom: 10px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .stat-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← 返回</a>
+            <h1>🚨 海康报警接口测试</h1>
+        </div>
+        
+        <div class="api-grid">
+            <!-- 查询报警记录 -->
+            <div class="api-card" style="grid-column: span 2;">
+                <div class="api-header">
+                    <h3>查询报警记录</h3>
+                    <span class="method-badge get">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始时间</label>
+                            <input type="text" id="alarm_start" placeholder="yyyy-MM-dd HH:mm:ss">
+                        </div>
+                        <div class="form-group">
+                            <label>结束时间</label>
+                            <input type="text" id="alarm_end" placeholder="yyyy-MM-dd HH:mm:ss">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>报警类型（可选）</label>
+                            <input type="text" id="alarm_type" placeholder="如：进入区域">
+                        </div>
+                        <div class="form-group">
+                            <label>设备名称（可选）</label>
+                            <input type="text" id="alarm_device" placeholder="设备名称">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>页码</label>
+                            <input type="number" id="alarm_page" value="1" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>每页数量</label>
+                            <input type="number" id="alarm_size" value="15" min="1" max="100">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="testSelectAlarm()">查询报警记录</button>
+                    <div class="response-area" id="res1"></div>
+                </div>
+            </div>
+
+            <!-- 近6月报警统计 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>近6月报警统计</h3>
+                    <span class="method-badge get">GET</span>
+                </div>
+                <div class="api-body">
+                    <p style="color:#aaa;margin-bottom:15px;">获取最近6个月的报警数量统计（按月汇总）</p>
+                    <button class="btn btn-primary" onclick="testMonthlyStats()">获取统计</button>
+                    <div class="response-area" id="res2"></div>
+                </div>
+            </div>
+
+            <!-- 报警类型统计 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>报警类型统计</h3>
+                    <span class="method-badge get">GET</span>
+                </div>
+                <div class="api-body">
+                    <p style="color:#aaa;margin-bottom:15px;">获取所有报警类型及其出现次数</p>
+                    <button class="btn btn-primary" onclick="testAlarmCount()">获取统计</button>
+                    <div class="response-area" id="res3"></div>
+                </div>
+            </div>
+
+            <!-- 人数计数接口说明 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>人数计数接口</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="note">
+                        此接口由摄像头主动调用，用于接收人数计数数据。<br>
+                        接口地址：<code>/api/HikAlarm/CountingCamera</code>
+                    </div>
+                    <p style="color:#aaa;">摄像头需要配置上报地址为本服务的该接口URL。</p>
+                    <div class="stat-card">
+                        <h4>接口说明</h4>
+                        <div class="stat-item">
+                            <span>请求方式</span>
+                            <span>POST</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Content-Type</span>
+                            <span>application/x-www-form-urlencoded</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>表单字段</span>
+                            <span>personQueueCounting (JSON)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 行为分析接口说明 -->
+            <div class="api-card">
+                <div class="api-header">
+                    <h3>行为分析接口</h3>
+                    <span class="method-badge post">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="note">
+                        此接口由摄像头主动调用，用于接收行为分析JSON数据。<br>
+                        接口地址：<code>/api/HikAlarm/BehaviorAnalysisJson</code>
+                    </div>
+                    <p style="color:#aaa;">摄像头需要配置上报地址为本服务的该接口URL。</p>
+                    <div class="stat-card">
+                        <h4>接口说明</h4>
+                        <div class="stat-item">
+                            <span>请求方式</span>
+                            <span>POST</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>Content-Type</span>
+                            <span>application/json</span>
+                        </div>
+                        <div class="stat-item">
+                            <span>主要字段</span>
+                            <span>eventType, dateTime, targetAttrs</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function apiCall(url, method, data, resId) {
+            const resEl = document.getElementById(resId);
+            resEl.textContent = '请求中...';
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (data) options.body = JSON.stringify(data);
+                const response = await fetch(url, options);
+                const result = await response.json();
+                resEl.textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                resEl.textContent = '错误: ' + e.message;
+            }
+        }
+
+        function testSelectAlarm() {
+            const params = new URLSearchParams();
+            const start = document.getElementById('alarm_start').value;
+            const end = document.getElementById('alarm_end').value;
+            const type = document.getElementById('alarm_type').value;
+            const device = document.getElementById('alarm_device').value;
+            const page = document.getElementById('alarm_page').value;
+            const size = document.getElementById('alarm_size').value;
+            
+            if (start) params.append('startTime', start);
+            if (end) params.append('endTime', end);
+            if (type) params.append('eventType', type);
+            if (device) params.append('deviceName', device);
+            params.append('pageNumber', page);
+            params.append('pageSize', size);
+            
+            apiCall('/api/HikAlarm/SelectAlarmInfomation?' + params.toString(), 'GET', null, 'res1');
+        }
+
+        function testMonthlyStats() {
+            apiCall('/api/HikAlarm/GetRecentSixMonthAlarmStats', 'GET', null, 'res2');
+        }
+
+        function testAlarmCount() {
+            apiCall('/api/HikAlarm/GetAllAlarmRecordCount', 'GET', null, 'res3');
+        }
+    </script>
+</body>
+</html>
